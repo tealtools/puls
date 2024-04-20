@@ -1,9 +1,11 @@
 mod config;
-use config::config::Args;
+mod docker_compose;
+
+use config::config::AppConfig;
 use clap::Parser;
 
 fn main() {
-    let args = Args::parse();
+    let args = AppConfig::parse();
 
     println!("Hello, world!");
 }
