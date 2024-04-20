@@ -28,9 +28,6 @@ pub struct AppConfig {
     #[arg(short, long, default_value = "3")]
     pub num_bookies_per_cluster: u32,
 
-    #[arg(short, long, default_value = "3")]
-    pub num_oxias_per_cluster: u32,
-
     #[arg(short, long, default_value = "Small")]
     pub resources: BasicConfigResources,
 }
