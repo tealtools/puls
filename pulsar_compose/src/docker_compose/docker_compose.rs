@@ -3,13 +3,8 @@ use std::cmp::min;
 
 pub fn generate_template(config: AppConfig) -> String {
     let zookeepers_per_cluster = config.num_zookeepers_per_cluster;
-    let zookeeper_templates = (0..config.num_clusters)
-        .map(|cluster_index| {
-            (0..zookeepers_per_cluster)
-                .map(|zookeeper_index| generate_zookeeper_template(config.clone(), format!("cluster-{cluster_index}"), zookeeper_index))
-                .collect::<Vec<String>>()
-                .join("\n")
-        })
+    let zookeeper_templates = (0..zookeepers_per_cluster)
+        .map(|zookeeper_index| generate_zookeeper_template(config.clone(), zookeeper_index))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -48,7 +43,12 @@ volumes:
 pub fn generate_cluster_template(app_config: AppConfig, cluster_name: String) -> String {
     let pulsar_init_template =
         generate_pulsar_init_template(app_config.clone(), cluster_name.clone());
-    let broker_template = generate_broker_template(app_config.clone(), cluster_name.clone());
+
+    let broker_template = (0..app_config.num_brokers_per_cluster)
+        .map(|i| generate_broker_template(app_config.clone(), cluster_name.clone(), i))
+        .collect::<Vec<String>>()
+        .join("\n");
+
     let bookie_templates = (0..app_config.num_bookies_per_cluster)
         .map(|i| generate_bookie_template(app_config.clone(), cluster_name.clone(), i))
         .collect::<Vec<String>>()
@@ -68,15 +68,16 @@ pub fn generate_cluster_template(app_config: AppConfig, cluster_name: String) ->
     .to_string()
 }
 
-pub fn generate_zookeeper_template(app_config: AppConfig, cluster_name: String, zookeeper_index: u32) -> String {
+pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) -> String {
     let pulsar_version = app_config.pulsar_version;
 
     let zookeepers_per_cluster = app_config.num_zookeepers_per_cluster;
     let zookeeper_servers = (0..zookeepers_per_cluster)
-        .map(|i| format!("server.{i}=zookeeper-{cluster_name}-{i}:2888:3888"))
+        .map(|i| format!("server.{i}=zookeeper-{i}:2888:3888"))
         .collect::<Vec<String>>();
 
-    let append_zookeeper_servers = zookeeper_servers.iter()
+    let append_zookeeper_servers = zookeeper_servers
+        .iter()
         .map(|server| format!("echo \"{}\" >> /pulsar/conf/zookeeper.conf", server))
         .collect::<Vec<String>>()
         .join("; ");
@@ -85,7 +86,7 @@ pub fn generate_zookeeper_template(app_config: AppConfig, cluster_name: String, 
 
     format! {"
 ████# Zookeeper for Pulsar
-████zookeeper-{cluster_name}-{zookeeper_index}:
+████zookeeper-{zookeeper_index}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
 ████████restart: on-failure
@@ -108,7 +109,7 @@ pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String
     let broker_service_url = "pulsar://broker-{custer_name}:6650";
     let zookeepers_per_cluster = app_config.num_zookeepers_per_cluster;
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
-        .map(|i| format!("████████████zookeeper-{cluster_name}-{i}:\n████████████████condition: service_healthy"))
+        .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -117,21 +118,20 @@ pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String
 ████pulsar-init-{cluster_name}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
-████████command: bash -c \"bin/pulsar initialize-cluster-metadata --cluster {cluster_name} --metadata-store zk:zookeeper-{cluster_name}-0:2181 --configuration-metadata-store zk:zookeeper-{cluster_name}-0:2181 --web-service-url {web_service_url} --broker-service-url {broker_service_url}\"
+████████command: bash -c \"bin/pulsar initialize-cluster-metadata --cluster {cluster_name} --metadata-store zk:zookeeper-0:2181/{cluster_name} --configuration-metadata-store zk:zookeeper-0:2181/{cluster_name} --web-service-url {web_service_url} --broker-service-url {broker_service_url}\"
 ████████depends_on:
 {depends_on_zookeeper_template}
 "}.trim().to_string()
 }
 
-pub fn generate_broker_template(app_config: AppConfig, cluster_name: String) -> String {
+pub fn generate_broker_template(app_config: AppConfig, cluster_name: String, broker_index: u32) -> String {
     let pulsar_version = app_config.pulsar_version;
-    let num_replicas = app_config.num_brokers_per_cluster;
     let managed_ledger_default_ensemble_size = min(app_config.num_bookies_per_cluster, 3);
     let managed_ledger_default_write_quorum = min(app_config.num_bookies_per_cluster, 3);
     let managed_ledger_default_ack_quorum = min(app_config.num_bookies_per_cluster, 3);
     let zookeepers_per_cluster = app_config.num_zookeepers_per_cluster;
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
-        .map(|i| format!("████████████zookeeper-{cluster_name}-{i}:\n████████████████condition: service_healthy"))
+        .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -141,13 +141,13 @@ pub fn generate_broker_template(app_config: AppConfig, cluster_name: String) -> 
         .join("\n");
 
     let metadata_store_url = (0..zookeepers_per_cluster)
-        .map(|i| format!("zk:zookeeper-{cluster_name}-{i}:2181"))
+        .map(|i| format!("zk:zookeeper-{i}:2181"))
         .collect::<Vec<String>>()
         .join(",");
 
     format! {"
 ████# Pulsar broker for cluster {cluster_name}
-████broker-{cluster_name}:
+████broker-{cluster_name}-{broker_index}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
 ████████restart: on-failure
@@ -158,17 +158,11 @@ pub fn generate_broker_template(app_config: AppConfig, cluster_name: String) -> 
 ████████████- managedLedgerDefaultEnsembleSize={managed_ledger_default_ensemble_size}
 ████████████- managedLedgerDefaultWriteQuorum={managed_ledger_default_write_quorum}
 ████████████- managedLedgerDefaultAckQuorum={managed_ledger_default_ack_quorum}
-████████████- advertisedAddress=broker
-████████████- advertisedListeners=external:pulsar://127.0.0.1:6650
 ████████████- PULSAR_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
 ████████command: bash -c \"bin/apply-config-from-env.py conf/broker.conf && exec bin/pulsar broker\"
 ████████depends_on:
 {depends_on_zookeeper_template}
 {depends_on_bookies_template}
-████████deploy:
-████████████mode: replicated
-████████████replicas: {num_replicas}
-████████████endpoint_mode: dnsrr
 "}
     .trim()
     .to_string()
@@ -196,15 +190,16 @@ pub fn generate_bookie_template(
     let zookeepers_per_cluster = app_config.num_zookeepers_per_cluster;
 
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
-        .map(|i| format!("████████████zookeeper-{cluster_name}-{i}:\n████████████████condition: service_healthy"))
+        .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
 
-    let metadata_service_uri = format!("zk://{}",
+    let metadata_service_uri = format!(
+        "zk://{}",
         (0..zookeepers_per_cluster)
-        .map(|i| format!("zookeeper-{cluster_name}-{i}:2181"))
-        .collect::<Vec<String>>()
-        .join(";")
+            .map(|i| format!("zookeeper-{i}:2181"))
+            .collect::<Vec<String>>()
+            .join(";")
     ) + "/ledgers";
 
     format! {"
@@ -216,8 +211,7 @@ pub fn generate_bookie_template(
 ████████environment:
 ████████████- clusterName={cluster_name}
 ████████████- metadataServiceUri={metadata_service_uri}
-████████████- advertisedAddress=bookie
-████████████- useHostNameAsBookieID=\"true\"
+████████████- useHostNameAsBookieID=true
 ████████████- BOOKIE_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
 ████████████- dbStorage_writeCacheMaxSizeMb=32
 ████████████- dbStorage_readAheadCacheMaxSizeMb=32
