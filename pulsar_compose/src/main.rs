@@ -3,9 +3,11 @@ mod docker_compose;
 
 use config::config::AppConfig;
 use clap::Parser;
+use docker_compose::docker_compose::generate_template;
 
 fn main() {
-    let args = AppConfig::parse();
+    let config = AppConfig::parse();
+    let template = generate_template(config);
 
-    println!("Hello, world!");
+    println!("{}", template)
 }

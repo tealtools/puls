@@ -13,20 +13,23 @@ pub enum BasicConfigResources {
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None)]
 pub struct AppConfig {
-    #[arg(short, long, default_value = "default")]
+    #[arg(long, default_value = "default")]
     pub instance_name: String,
 
-    #[arg(short, long, default_value = "3.2.2")]
+    #[arg(long, default_value = "3.2.2")]
     pub pulsar_version: String,
 
-    #[arg(short, long, default_value = "1")]
+    #[arg(long, default_value = "1")]
     pub num_clusters: u32,
 
-    #[arg(short, long, default_value = "3")]
+    #[arg(long, default_value = "3")]
     pub num_brokers_per_cluster: u32,
 
-    #[arg(short, long, default_value = "3")]
+    #[arg(long, default_value = "3")]
     pub num_bookies_per_cluster: u32,
+
+    #[arg(long, default_value = "3")]
+    pub num_zookeepers_per_cluster: u32,
 
     #[arg(short, long, default_value = "Small")]
     pub resources: BasicConfigResources,
