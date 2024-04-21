@@ -23,13 +23,13 @@ pub struct AppConfig {
     pub num_clusters: u32,
 
     #[arg(long, default_value = "3")]
-    pub num_brokers_per_cluster: u32,
+    pub num_brokers: u32,
 
     #[arg(long, default_value = "3")]
-    pub num_bookies_per_cluster: u32,
+    pub num_bookies: u32,
 
     #[arg(long, default_value = "3")]
-    pub num_zookeepers_per_cluster: u32,
+    pub num_zookeepers: u32,
 
     #[arg(short, long, default_value = "Small")]
     pub resources: BasicConfigResources,
