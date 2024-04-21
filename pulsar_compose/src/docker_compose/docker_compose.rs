@@ -30,7 +30,7 @@ pub fn generate_template(app_config: AppConfig) -> String {
     let instance_name = app_config.instance_name;
 
     format! {"
-version: '2'
+version: '3'
 services:
 {zookeeper_templates}
 
@@ -49,7 +49,7 @@ networks:
 
 pub fn generate_cluster_template(app_config: AppConfig, cluster_name: String, cluster_index: u32) -> String {
     let pulsar_init_template =
-        generate_pulsar_init_template(app_config.clone(), cluster_name.clone());
+        generate_pulsar_init_template(app_config.clone(), cluster_name.clone(), cluster_index);
 
     let brokers_template = (0..app_config.num_brokers_per_cluster)
         .map(|i| generate_broker_template(app_config.clone(), cluster_name.clone(), i))
@@ -169,7 +169,7 @@ pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) 
     .to_string()
 }
 
-pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String) -> String {
+pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String, cluster_index: u32) -> String {
     let pulsar_version = app_config.pulsar_version;
     let web_service_url = "http://broker-{cluster_name}:8080";
     let broker_service_url = "pulsar://broker-{custer_name}:6650";
@@ -178,6 +178,13 @@ pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String
         .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
+
+    let depends_on_prev_cluster = if cluster_index == 0 {
+        "".to_string()
+    } else {
+        let prev_cluster_name = format!("cluster-{}", cluster_index - 1);
+        format!("████████████pulsar-proxy-{prev_cluster_name}:\n████████████████condition: service_healthy")
+    };
 
     let instance_name = app_config.instance_name;
 
@@ -191,6 +198,7 @@ pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String
 ████████████- PULSAR_MEM=\"-Xms256m -Xmx256m -XX:MaxDirectMemorySize=128m\"
 ████████depends_on:
 {depends_on_zookeeper_template}
+{depends_on_prev_cluster}
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}.trim().to_string()
@@ -237,6 +245,7 @@ pub fn generate_broker_template(
 ████████████- managedLedgerDefaultWriteQuorum={managed_ledger_default_write_quorum}
 ████████████- managedLedgerDefaultAckQuorum={managed_ledger_default_ack_quorum}
 ████████████- PULSAR_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+████████████- PULSAR_GC=-XX:+UseG1GC
 ████████command: bash -c \"bin/apply-config-from-env.py conf/broker.conf && exec bin/pulsar broker\"
 ████████healthcheck:
 ████████████test: [\"CMD\", \"curl\", \"--fail\", \"http://127.0.0.1:8080/admin/v2/brokers/health\"]
@@ -300,8 +309,9 @@ pub fn generate_bookie_template(
 ████████████- metadataServiceUri={metadata_service_uri}
 ████████████- useHostNameAsBookieID=true
 ████████████- BOOKIE_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
-████████████- dbStorage_writeCacheMaxSizeMb=32
-████████████- dbStorage_readAheadCacheMaxSizeMb=32
+████████████- PULSAR_GC=-XX:+UseG1GC
+████████████- dbStorage_writeCacheMaxSizeMb=16
+████████████- dbStorage_readAheadCacheMaxSizeMb=16
 ████████depends_on:
 ████████████pulsar-init-{cluster_name}:
 ████████████████condition: service_completed_successfully
@@ -315,6 +325,7 @@ pub fn generate_bookie_template(
 ████████████interval: 10s
 ████████████timeout: 30s
 ████████████retries: 30
+████████████start_period: 60s
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}.trim().to_string()
