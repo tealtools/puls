@@ -248,15 +248,21 @@ pub fn generate_post_cluster_create_job_template(
         .map(|cluster_index| format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} clusters create --url http://pulsar-proxy-cluster-{cluster_index}:8080 --broker-url pulsar://pulsar-proxy-cluster-{cluster_index}:6650 cluster-{cluster_index}"))
         .collect::<Vec<String>>()
         .join("; ");
-    let create_cluster_tenant_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} tenants create cluster-{cluster_index}-public --allowed-clusters cluster-{cluster_index}");
-    let create_cluster_namespace_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces create cluster-{cluster_index}-public/default");
+    let create_cluster_tenant_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} tenants create --allowed-clusters cluster-{cluster_index} cluster-{cluster_index}-local");
+    let create_cluster_namespace_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces create cluster-{cluster_index}-local/default");
+
+    let all_cluster_names = (0..num_clusters).map(|i| format!("cluster-{}", i)).collect::<Vec<String>>().join(",");
+
+    let create_global_tenant_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} tenants create --allowed-clusters {all_cluster_names} global");
+    let create_global_namespace_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces create global/default");
+    let set_global_namespace_clusters_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces set-clusters --clusters {all_cluster_names} global/default");
 
     format! {"
 ████# Register new cluster {cluster_name}
 ████pulsar-post-cluster-create-job-{cluster_name}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
-████████command: bash -c \"{register_clusters_script}; {create_cluster_tenant_script}; {create_cluster_namespace_script}\"
+████████command: bash -c \"{register_clusters_script}; {create_cluster_tenant_script}; {create_cluster_namespace_script}; {create_global_tenant_script}; {create_global_namespace_script}; {set_global_namespace_clusters_script};\"
 {depends_on_proxy_template}
 {depends_on_prev_cluster_template}
 ████████networks:
