@@ -54,6 +54,9 @@ pub fn generate_cluster_template(app_config: AppConfig, cluster_name: String) ->
         .collect::<Vec<String>>()
         .join("\n");
 
+    let pulsar_proxy_template =
+        generate_pulsar_proxy_template(app_config.clone(), cluster_name.clone());
+
     format! {"
 ████# BEGIN Pulsar cluster {cluster_name} definition
 
@@ -62,10 +65,43 @@ pub fn generate_cluster_template(app_config: AppConfig, cluster_name: String) ->
 {broker_template}
 
 {bookie_templates}
+
+{pulsar_proxy_template}
 ████# END Pulsar cluster {cluster_name} definition
 "}
     .trim()
     .to_string()
+}
+
+pub fn generate_pulsar_proxy_template(app_config: AppConfig, cluster_name: String) -> String {
+    let pulsar_version = app_config.pulsar_version;
+    let zookeepers_per_cluster = app_config.num_zookeepers_per_cluster;
+    let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
+        .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
+        .collect::<Vec<String>>()
+        .join("\n");
+    let metadata_store_url = (0..zookeepers_per_cluster)
+        .map(|i| format!("zk:zookeeper-{i}:2181"))
+        .collect::<Vec<String>>()
+        .join(",");
+
+    format! {"
+████# Pulsar proxy for cluster {cluster_name}
+████pulsar-proxy-{cluster_name}:
+████████image: apachepulsar/pulsar:{pulsar_version}
+████████user: pulsar
+████████command: bash -c \"bin/apply-config-from-env.py conf/proxy.conf && bin/apply-config-from-env.py conf/pulsar_env.sh && bin/pulsar proxy\"
+████████ports:
+████████████- 8080:8080
+████████████- 6650:6650
+████████environment:
+████████████- clusterName={cluster_name}
+████████████- metadataStoreUrl={metadata_store_url}
+████████████- configurationMetadataStoreUrl={metadata_store_url}
+████████████- PULSAR_MEM=-Xms256m -Xmx256m -XX:MaxDirectMemorySize=128m
+████████depends_on:
+{depends_on_zookeeper_template}
+    "}
 }
 
 pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) -> String {
@@ -124,7 +160,11 @@ pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String
 "}.trim().to_string()
 }
 
-pub fn generate_broker_template(app_config: AppConfig, cluster_name: String, broker_index: u32) -> String {
+pub fn generate_broker_template(
+    app_config: AppConfig,
+    cluster_name: String,
+    broker_index: u32,
+) -> String {
     let pulsar_version = app_config.pulsar_version;
     let managed_ledger_default_ensemble_size = min(app_config.num_bookies_per_cluster, 3);
     let managed_ledger_default_write_quorum = min(app_config.num_bookies_per_cluster, 3);
