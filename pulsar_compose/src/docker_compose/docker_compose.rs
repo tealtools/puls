@@ -97,8 +97,8 @@ pub fn generate_pulsar_proxy_template(app_config: AppConfig, cluster_name: Strin
         .collect::<Vec<String>>()
         .join("\n");
 
-    let web_service_port = 8080 + cluster_index;
-    let broker_service_port = 6650 + cluster_index;
+    let web_service_port = (cluster_index.to_string() + "8080").parse::<u32>().unwrap();
+    let broker_service_port = (cluster_index.to_string() + "6650").parse::<u32>().unwrap();
 
     let instance_name = app_config.instance_name;
 
