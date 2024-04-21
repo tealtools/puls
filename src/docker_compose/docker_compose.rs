@@ -1,21 +1,21 @@
-use crate::config::config::AppConfig;
+use crate::config::config::PulsarInstanceConfig;
 use std::cmp::min;
 
-pub fn generate_template(app_config: AppConfig) -> String {
-    let zookeepers_per_cluster = app_config.num_zookeepers;
+pub fn generate_template(instance_config: PulsarInstanceConfig) -> String {
+    let zookeepers_per_cluster = instance_config.num_zookeepers;
     let zookeeper_templates = (0..zookeepers_per_cluster)
-        .map(|zookeeper_index| generate_zookeeper_template(app_config.clone(), zookeeper_index))
+        .map(|zookeeper_index| generate_zookeeper_template(instance_config.clone(), zookeeper_index))
         .collect::<Vec<String>>()
         .join("\n");
 
-    let num_clusters = app_config.num_clusters;
+    let num_clusters = instance_config.num_clusters;
     let cluster_names = (0..num_clusters).map(|i| format!("cluster-{}", i));
     let cluster_templates = cluster_names
         .clone()
         .enumerate()
         .map(|(cluster_index, cluster_name)| {
             generate_cluster_template(
-                app_config.clone(),
+                instance_config.clone(),
                 cluster_name,
                 u32::try_from(cluster_index).unwrap(),
             )
@@ -25,7 +25,7 @@ pub fn generate_template(app_config: AppConfig) -> String {
 
     let volumes_template = cluster_names
         .map(|cluster_name| {
-            (0..app_config.num_bookies)
+            (0..instance_config.num_bookies)
                 .map(|i| format!("████bookie-data-{cluster_name}-{i}:"))
                 .collect::<Vec<String>>()
                 .join("\n")
@@ -33,7 +33,7 @@ pub fn generate_template(app_config: AppConfig) -> String {
         .collect::<Vec<String>>()
         .join("\n");
 
-    let instance_name = app_config.instance_name;
+    let instance_name = instance_config.name;
 
     format! {"
 version: '3'
@@ -54,27 +54,27 @@ networks:
 }
 
 pub fn generate_cluster_template(
-    app_config: AppConfig,
+    instance_config: PulsarInstanceConfig,
     cluster_name: String,
     cluster_index: u32,
 ) -> String {
     let pulsar_init_job_template =
-        generate_pulsar_init_job_template(app_config.clone(), cluster_name.clone(), cluster_index);
+        generate_pulsar_init_job_template(instance_config.clone(), cluster_name.clone(), cluster_index);
 
-    let brokers_template = (0..app_config.num_brokers)
-        .map(|i| generate_broker_template(app_config.clone(), cluster_name.clone(), i))
+    let brokers_template = (0..instance_config.num_brokers)
+        .map(|i| generate_broker_template(instance_config.clone(), cluster_name.clone(), i))
         .collect::<Vec<String>>()
         .join("\n");
 
-    let bookies_template = (0..app_config.num_bookies)
-        .map(|i| generate_bookie_template(app_config.clone(), cluster_name.clone(), i))
+    let bookies_template = (0..instance_config.num_bookies)
+        .map(|i| generate_bookie_template(instance_config.clone(), cluster_name.clone(), i))
         .collect::<Vec<String>>()
         .join("\n");
 
     let pulsar_proxy_template =
-        generate_pulsar_proxy_template(app_config.clone(), cluster_name.clone(), cluster_index);
+        generate_pulsar_proxy_template(instance_config.clone(), cluster_name.clone(), cluster_index);
 
-    let post_cluster_create_job_template = generate_post_cluster_create_job_template(app_config.clone(), cluster_name.clone(), cluster_index);
+    let post_cluster_create_job_template = generate_post_cluster_create_job_template(instance_config.clone(), cluster_name.clone(), cluster_index);
 
     format! {"
 ████# BEGIN Pulsar cluster {cluster_name} definition
@@ -95,12 +95,12 @@ pub fn generate_cluster_template(
 }
 
 pub fn generate_pulsar_proxy_template(
-    app_config: AppConfig,
+    instance_config: PulsarInstanceConfig,
     cluster_name: String,
     cluster_index: u32,
 ) -> String {
-    let pulsar_version = app_config.pulsar_version;
-    let zookeepers_per_cluster = app_config.num_zookeepers;
+    let pulsar_version = instance_config.pulsar_version;
+    let zookeepers_per_cluster = instance_config.num_zookeepers;
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
         .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
@@ -110,7 +110,7 @@ pub fn generate_pulsar_proxy_template(
         .collect::<Vec<String>>()
         .join(",");
 
-    let depends_on_brokers_template = (0..app_config.num_brokers)
+    let depends_on_brokers_template = (0..instance_config.num_brokers)
         .map(|i| format!("████████████broker-{cluster_name}-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
@@ -118,7 +118,7 @@ pub fn generate_pulsar_proxy_template(
     let web_service_port = (cluster_index.to_string() + "8080").parse::<u32>().unwrap();
     let broker_service_port = (cluster_index.to_string() + "6650").parse::<u32>().unwrap();
 
-    let instance_name = app_config.instance_name;
+    let instance_name = instance_config.name;
 
     format! {"
 ████# Pulsar proxy for cluster {cluster_name}
@@ -148,10 +148,10 @@ pub fn generate_pulsar_proxy_template(
 "}
 }
 
-pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) -> String {
-    let pulsar_version = app_config.pulsar_version;
+pub fn generate_zookeeper_template(instance_config: PulsarInstanceConfig, zookeeper_index: u32) -> String {
+    let pulsar_version = instance_config.pulsar_version;
 
-    let zookeepers_per_cluster = app_config.num_zookeepers;
+    let zookeepers_per_cluster = instance_config.num_zookeepers;
     let zookeeper_servers = (0..zookeepers_per_cluster)
         .map(|i| format!("server.{i}=zookeeper-{i}:2888:3888"))
         .collect::<Vec<String>>();
@@ -164,7 +164,7 @@ pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) 
 
     let create_my_id_if_not_exists = format!("if [ ! -f /pulsar/data/zookeeper/myid ]; then mkdir -p /pulsar/data/zookeeper && echo {zookeeper_index} > /pulsar/data/zookeeper/myid; fi");
 
-    let instance_name = app_config.instance_name;
+    let instance_name = instance_config.name;
 
     format! {"
 ████# Zookeeper for Pulsar
@@ -188,14 +188,14 @@ pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) 
 }
 
 pub fn generate_pulsar_init_job_template(
-    app_config: AppConfig,
+    instance_config: PulsarInstanceConfig,
     cluster_name: String,
     cluster_index: u32,
 ) -> String {
-    let pulsar_version = app_config.pulsar_version;
+    let pulsar_version = instance_config.pulsar_version;
     let web_service_url = "http://broker-{cluster_name}:8080";
     let broker_service_url = "pulsar://broker-{custer_name}:6650";
-    let zookeepers_per_cluster = app_config.num_zookeepers;
+    let zookeepers_per_cluster = instance_config.num_zookeepers;
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
         .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
@@ -208,7 +208,7 @@ pub fn generate_pulsar_init_job_template(
         format!("████████████pulsar-proxy-{prev_cluster_name}:\n████████████████condition: service_healthy")
     };
 
-    let instance_name = app_config.instance_name;
+    let instance_name = instance_config.name;
 
     format! {"
 ████# Pulsar init job for cluster {cluster_name}
@@ -227,12 +227,12 @@ pub fn generate_pulsar_init_job_template(
 }
 
 pub fn generate_post_cluster_create_job_template(
-    app_config: AppConfig,
+    instance_config: PulsarInstanceConfig,
     cluster_name: String,
     cluster_index: u32,
 ) -> String {
-    let pulsar_version = app_config.pulsar_version;
-    let instance_name = app_config.instance_name;
+    let pulsar_version = instance_config.pulsar_version;
+    let instance_name = instance_config.name;
     let depends_on_proxy_template = format!("████████depends_on:\n████████████pulsar-proxy-{cluster_name}:\n████████████████condition: service_healthy");
     let depends_on_prev_cluster_template = if cluster_index == 0 {
         "".to_string()
@@ -243,7 +243,7 @@ pub fn generate_post_cluster_create_job_template(
 
     let pulsar_proxy_admin_url = format!("http://pulsar-proxy-{cluster_name}:8080");
 
-    let num_clusters = app_config.num_clusters;
+    let num_clusters = instance_config.num_clusters;
     let register_clusters_script = (0..num_clusters)
         .map(|cluster_index| format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} clusters create --url http://pulsar-proxy-cluster-{cluster_index}:8080 --broker-url pulsar://pulsar-proxy-cluster-{cluster_index}:6650 cluster-{cluster_index}"))
         .collect::<Vec<String>>()
@@ -271,21 +271,21 @@ pub fn generate_post_cluster_create_job_template(
 }
 
 pub fn generate_broker_template(
-    app_config: AppConfig,
+    instance_config: PulsarInstanceConfig,
     cluster_name: String,
     broker_index: u32,
 ) -> String {
-    let pulsar_version = app_config.pulsar_version;
-    let managed_ledger_default_ensemble_size = min(app_config.num_bookies, 3);
-    let managed_ledger_default_write_quorum = min(app_config.num_bookies, 3);
-    let managed_ledger_default_ack_quorum = min(app_config.num_bookies, 3);
-    let zookeepers_per_cluster = app_config.num_zookeepers;
+    let pulsar_version = instance_config.pulsar_version;
+    let managed_ledger_default_ensemble_size = min(instance_config.num_bookies, 3);
+    let managed_ledger_default_write_quorum = min(instance_config.num_bookies, 3);
+    let managed_ledger_default_ack_quorum = min(instance_config.num_bookies, 3);
+    let zookeepers_per_cluster = instance_config.num_zookeepers;
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
         .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
 
-    let depends_on_bookies_template = (0..app_config.num_bookies)
+    let depends_on_bookies_template = (0..instance_config.num_bookies)
         .map(|i| format!("████████████bookie-{cluster_name}-{i}:\n████████████████condition: service_healthy"))
         .collect::<Vec<String>>()
         .join("\n");
@@ -295,7 +295,7 @@ pub fn generate_broker_template(
         .collect::<Vec<String>>()
         .join(",");
 
-    let instance_name = app_config.instance_name;
+    let instance_name = instance_config.name;
 
     format! {"
 ████# Pulsar broker for cluster {cluster_name}
@@ -329,11 +329,11 @@ pub fn generate_broker_template(
 }
 
 pub fn generate_bookie_template(
-    app_config: AppConfig,
+    instance_config: PulsarInstanceConfig,
     cluster_name: String,
     bookie_index: u32,
 ) -> String {
-    let pulsar_version = app_config.pulsar_version;
+    let pulsar_version = instance_config.pulsar_version;
     let depends_on_bookie: Option<u32> = if bookie_index == 0 {
         None
     } else {
@@ -347,7 +347,7 @@ pub fn generate_bookie_template(
         None => "".to_string(),
     };
 
-    let zookeepers_per_cluster = app_config.num_zookeepers;
+    let zookeepers_per_cluster = instance_config.num_zookeepers;
 
     let depends_on_zookeeper_template = (0..zookeepers_per_cluster)
         .map(|i| format!("████████████zookeeper-{i}:\n████████████████condition: service_healthy"))
@@ -362,7 +362,7 @@ pub fn generate_bookie_template(
             .join(";")
     ) + "/ledgers";
 
-    let instance_name = app_config.instance_name;
+    let instance_name = instance_config.name;
 
     format! {"
 ████# Bookie for cluster {cluster_name}

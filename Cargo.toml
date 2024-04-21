@@ -5,4 +5,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.4", features = ["derive"] }
+dirs = "5.0.1"
+rand = "0.8.5"
+regex = "1.10.4"
+serde = { version = "1.0.198", features = ["derive", "serde_derive"] }
+serde_yaml = "0.9.34"
 strum = { version = "0.26.2", features = ["derive"] }

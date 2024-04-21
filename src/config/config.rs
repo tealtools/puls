@@ -1,20 +1,11 @@
 use clap::{command, Parser};
 use std::convert::From;
-use strum::EnumString;
+use serde::{Serialize, Deserialize};
 
-#[derive(EnumString, Clone, Debug)]
-pub enum BasicConfigResources {
-    Nano,
-    Micro,
-    Small,
-    Medium,
-}
-
-#[derive(Parser, Clone, Debug)]
+#[derive(Parser, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[command(version, about, long_about = None)]
-pub struct AppConfig {
-    #[arg(long, default_value = "default")]
-    pub instance_name: String,
+pub struct PulsarInstanceConfig {
+    pub name: String,
 
     #[arg(long, default_value = "3.2.2")]
     pub pulsar_version: String,
@@ -30,7 +21,4 @@ pub struct AppConfig {
 
     #[arg(long, default_value = "3")]
     pub num_zookeepers: u32,
-
-    #[arg(short, long, default_value = "Small")]
-    pub resources: BasicConfigResources,
 }
