@@ -1,5 +1,5 @@
 [package]
-name = "pulsar_compose"
+name = "pulsar-compose"
 version = "0.1.0"
 edition = "2021"
 
