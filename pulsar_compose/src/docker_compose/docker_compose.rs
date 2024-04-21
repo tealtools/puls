@@ -156,7 +156,7 @@ pub fn generate_zookeeper_template(app_config: AppConfig, zookeeper_index: u32) 
 ████████restart: on-failure
 ████████command: bash -c \"bin/apply-config-from-env.py conf/zookeeper.conf && bin/apply-config-from-env.py conf/pulsar_env.sh && {append_zookeeper_servers} && {create_my_id_if_not_exists} && exec bin/pulsar zookeeper\"
 ████████environment:
-████████████- PULSAR_MEM=\"-Xms256m -Xmx256m -XX:MaxDirectMemorySize=256m\"
+████████████- PULSAR_MEM=\"-Xms256m -Xmx256m -XX:MaxDirectMemorySize=128m\"
 ████████healthcheck:
 ████████████test: [\"CMD\", \"bin/pulsar-zookeeper-ruok.sh\"]
 ████████████interval: 5s
@@ -186,7 +186,9 @@ pub fn generate_pulsar_init_template(app_config: AppConfig, cluster_name: String
 ████pulsar-init-{cluster_name}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
-████████command: bash -c \"bin/pulsar initialize-cluster-metadata --cluster {cluster_name} --metadata-store zk:zookeeper-0:2181/{cluster_name} --configuration-metadata-store zk:zookeeper-0:2181/{cluster_name} --web-service-url {web_service_url} --broker-service-url {broker_service_url}\"
+████████command: bash -c \"bin/apply-config-from-env.py conf/pulsar_env.sh; bin/pulsar initialize-cluster-metadata --cluster {cluster_name} --metadata-store zk:zookeeper-0:2181/{cluster_name} --configuration-metadata-store zk:zookeeper-0:2181/{cluster_name} --web-service-url {web_service_url} --broker-service-url {broker_service_url}\"
+████████environment:
+████████████- PULSAR_MEM=\"-Xms256m -Xmx256m -XX:MaxDirectMemorySize=128m\"
 ████████depends_on:
 {depends_on_zookeeper_template}
 ████████networks:
