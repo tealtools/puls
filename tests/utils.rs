@@ -84,7 +84,7 @@ pub async fn check_namespace_exists(
         .arg(format!("http://localhost:{port}"))
         .arg("namespaces")
         .arg("list")
-        .arg(tenant)
+        .arg(tenant.clone())
         .spawn()?
         .wait_with_output()?
         .stdout;
