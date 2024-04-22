@@ -5,10 +5,14 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.82"
-clap = { version = "4.5.4", features = ["derive"] }
+assert_cmd = { version = "2.0.14", features = ["color", "color-auto"] }
+backon = "0.4.4"
+clap = { version = "4.5.4", features = ["derive", "env", "unicode", "wrap_help"] }
 ctrlc = { version = "3.4.4", features = ["termination"] }
 dirs = "5.0.1"
 regex = "1.10.4"
 serde = { version = "1.0.198", features = ["derive", "serde_derive"] }
 serde_yaml = "0.9.34"
 strum = { version = "0.26.2", features = ["derive"] }
+tokio = { version = "1.37.0", features = ["full", "test-util"] }
+uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }

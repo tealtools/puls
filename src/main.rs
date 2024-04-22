@@ -19,6 +19,16 @@ struct Cli {
 
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None, arg_required_else_help(true))]
+pub struct CreateCommandArgs {
+    #[clap(flatten)]
+    pub instance_config: InstanceConfig,
+
+    #[arg(long, default_value_t = false)]
+    pub overwrite: bool,
+}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct RunCommandArgs {
     pub instance_name: Option<String>,
 }
@@ -101,7 +111,7 @@ enum Commands {
 
     /// Create a new Pulsar instance
     #[command()]
-    Create(InstanceConfig),
+    Create(CreateCommandArgs),
 
     /// Delete specified Pulsar instance
     #[command()]
@@ -242,9 +252,9 @@ fn list_instances(_args: LsCommandArgs) -> Result<Vec<InstanceConfig>> {
     Ok(instance_configs)
 }
 
-fn create_cmd(instance_config: InstanceConfig, is_overwrite: bool) -> Result<()> {
-    println!("Creating a new Pulsar instance {}", instance_config.name);
-    write_instance_config(instance_config, is_overwrite)
+fn create_cmd(args: CreateCommandArgs) -> Result<()> {
+    println!("Creating a new Pulsar instance {}", args.instance_config.name);
+    write_instance_config(args.instance_config, args.overwrite)
 }
 
 fn render_cmd(args: RenderCommandArgs) -> Result<()> {
@@ -284,7 +294,10 @@ fn run_cmd(args: RunCommandArgs) -> Result<()> {
 
             let is_already_exists = is_instance_exists(default_instance_config.name.clone())?;
             if !is_already_exists {
-                create_cmd(default_instance_config.clone(), false)?;
+                create_cmd(CreateCommandArgs {
+                    instance_config: default_instance_config.clone(),
+                    overwrite: false,
+                })?;
             }
 
             default_instance_config.name
@@ -385,8 +398,13 @@ fn main() -> Result<()> {
 
     match args.command {
         Some(Commands::Render(args)) => render_cmd(args),
-        Some(Commands::Create(instance_config)) => {
-            match create_cmd(instance_config, false) {
+        Some(Commands::Create(args)) => {
+            let create_command_args = CreateCommandArgs {
+                instance_config: args.instance_config.clone(),
+                overwrite: false,
+            };
+
+            match create_cmd(create_command_args) {
                 Ok(_) => {
                     println!("Successfully created a new Pulsar instance config");
                 }

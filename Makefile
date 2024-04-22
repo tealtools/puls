@@ -2,6 +2,10 @@
 dev:
 	nix develop
 
+.PHONY: test
+test:
+	cargo test --verbose --jobs 1 -- --nocapture
+
 .PHONY: build
 build:
 	cross build --release --target x86_64-unknown-linux-gnu
