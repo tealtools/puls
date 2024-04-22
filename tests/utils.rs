@@ -21,8 +21,8 @@ pub fn kill_all_docker_containers() -> Result<()> {
     Ok(())
 }
 
-pub async fn check_cluster_exists(instance_index: u32, cluster_name: String) -> Result<()> {
-    let port: u32 = format!("{instance_index}8080").parse().unwrap();
+pub async fn check_cluster_exists(cluster_index: u32, cluster_name: String) -> Result<()> {
+    let port: u32 = format!("{cluster_index}8080").parse().unwrap();
     let out = Command::new("pulsar-admin")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -38,11 +38,11 @@ pub async fn check_cluster_exists(instance_index: u32, cluster_name: String) -> 
         .lines()
         .any(|line| line.contains(&cluster_name));
 
-    println!("Is cluster exists: {is_exists}");
+    println!("Is cluster {cluster_index} exists: {is_exists}");
 
     match is_exists {
         true => Ok(()),
-        false => Err(anyhow::anyhow!("Cluster not exists")),
+        false => Err(anyhow::anyhow!("Cluster {cluster_index} not exists")),
     }
 }
 
@@ -63,11 +63,11 @@ pub async fn check_tenant_exists(cluster_index: u32, tenant: String) -> Result<(
         .lines()
         .any(|line| line.contains(&tenant));
 
-    println!("Is tenant exists: {is_exists}");
+    println!("Is tenant cluster-{cluster_index} {tenant} exists: {is_exists}");
 
     match is_exists {
         true => Ok(()),
-        false => Err(anyhow::anyhow!("Tenant not exists")),
+        false => Err(anyhow::anyhow!("Tenant cluster-{cluster_index} {tenant} not exists")),
     }
 }
 
@@ -93,11 +93,11 @@ pub async fn check_namespace_exists(
         .lines()
         .any(|line| line.contains(&namespace));
 
-    println!("Is namespace exists: {is_exists}");
+    println!("Is namespace cluster-{cluster_index} {tenant}/{namespace} exists: {is_exists}");
 
     match is_exists {
         true => Ok(()),
-        false => Err(anyhow::anyhow!("Namespace not exists")),
+        false => Err(anyhow::anyhow!("Namespace cluster-{cluster_index} {tenant}/{namespace} not exists")),
     }
 }
 
