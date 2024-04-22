@@ -4,7 +4,7 @@ dev:
 
 .PHONY: test
 test:
-	cargo test --verbose --jobs 1 -- --nocapture
+	cargo test --verbose --jobs 1 -- --nocapture --test-threads=1
 
 .PHONY: build
 build:

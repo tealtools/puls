@@ -2,7 +2,7 @@ mod utils;
 
 use anyhow::Result;
 use assert_cmd::cargo::CommandCargoExt;
-use pulsar_compose::instance_config::{self, InstanceConfig};
+use pulsar_compose::instance_config::InstanceConfig;
 use std::process::Command;
 use tokio::time::{sleep, Duration};
 use utils::{
