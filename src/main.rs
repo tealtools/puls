@@ -7,36 +7,36 @@ use docker_compose::docker_compose::generate_template;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+use std::process;
 use std::process::Command;
-use std::process::{self, Stdio};
 
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct RunCommandArgs {
     pub instance_name: Option<String>,
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct StopCommandArgs {
     pub instance_name: String,
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct RenderCommandArgs {
     pub instance_name: String,
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct DeleteCommandArgs {
     pub instance_name: String,
 }
@@ -46,7 +46,7 @@ pub struct DeleteCommandArgs {
 pub struct LsCommandArgs {}
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct DescribeCommandArgs {
     pub instance_name: String,
 }
@@ -95,23 +95,29 @@ impl Default for InstanceConfig {
 
 #[derive(Subcommand)]
 enum Commands {
-    #[command()]
-    Render(RenderCommandArgs),
-
-    #[command()]
-    Create(InstanceConfig),
-
-    #[command()]
-    Delete(DeleteCommandArgs),
-
-    #[command()]
-    Ls(LsCommandArgs),
-
+    /// Run Pulsar instance
     #[command()]
     Run(RunCommandArgs),
 
+    /// Create a new Pulsar instance
+    #[command()]
+    Create(InstanceConfig),
+
+    /// Delete specified Pulsar instance
+    #[command()]
+    Delete(DeleteCommandArgs),
+
+    /// List all Pulsar instances
+    #[command()]
+    Ls(LsCommandArgs),
+
+    /// Stop specified Pulsar instance
     #[command()]
     Stop(StopCommandArgs),
+
+    /// Render docker-compose.yml template for the specified Pulsar instance
+    #[command()]
+    Render(RenderCommandArgs),
 }
 
 fn get_config_dir() -> Result<PathBuf> {
