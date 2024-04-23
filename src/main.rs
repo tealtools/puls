@@ -32,6 +32,12 @@ pub struct CreateCommandArgs {
 
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None)]
+pub struct EditCommandArgs {
+    pub instance_name: Option<String>
+}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None)]
 pub struct LogsCommandArgs {
     pub instance_name: Option<String>,
 
@@ -97,6 +103,10 @@ enum Commands {
     /// Create a new Pulsar instance
     #[command()]
     Create(CreateCommandArgs),
+
+    /// Edit existing Pulsar instance
+    #[command()]
+    Edit(EditCommandArgs),
 
     /// List all Pulsar instances
     #[command()]
@@ -270,6 +280,7 @@ fn create_cmd(args: CreateCommandArgs) -> Result<()> {
         "Creating a new Pulsar instance {}",
         args.instance_config.name
     );
+    println!("S, overwrite {}", args.overwrite);
     write_instance_config(args.instance_config, args.overwrite)
 }
 
@@ -287,6 +298,22 @@ fn ls_cmd(args: LsCommandArgs) -> Result<()> {
     for instance in instance_names {
         println!("{instance}");
     }
+
+    Ok(())
+}
+
+fn edit_cmd(args: EditCommandArgs) -> Result<()> {
+    let instance_name = args
+        .instance_name
+        .unwrap_or(DEFAULT_INSTANCE_NAME.to_string());
+
+    let instance_config_file = get_instance_config_file(instance_name.clone())?.to_string_lossy().to_string();
+
+    println!("Edit Pulsar instance {} config using default $EDITOR", instance_name);
+    println!("Instance config file: {}", instance_config_file);
+
+    let text_editor = std::env::var("EDITOR").unwrap_or("nano".to_string());
+    Command::new(text_editor).arg(instance_config_file).spawn()?.wait()?;
 
     Ok(())
 }
@@ -525,17 +552,37 @@ fn main() -> Result<()> {
     match args.command {
         Some(Commands::Render(args)) => render_cmd(args),
         Some(Commands::Create(args)) => {
-            let create_command_args = CreateCommandArgs {
-                instance_config: args.instance_config.clone(),
-                overwrite: false,
+            let event_name = if args.overwrite {
+                "updated"
+            } else {
+                "created"
             };
 
-            match create_cmd(create_command_args) {
+            match create_cmd(args.clone()) {
                 Ok(_) => {
-                    println!("Successfully created a new Pulsar instance config");
+                    println!("Pulsar instance successfully {event_name}");
                 }
                 Err(err) => {
-                    println!("Failed to create a new Pulsar instance config");
+                    let command_name = if args.overwrite {
+                        "update"
+                    } else {
+                        "create"
+                    };
+
+                    println!("Failed to {command_name} Pulsar instance config");
+                    println!("{}", err);
+                    process::exit(1)
+                }
+            };
+            Ok(())
+        }
+        Some(Commands::Edit(args)) => {
+            match edit_cmd(args.clone()) {
+                Ok(_) => {
+                    println!("Pulsar instance successfully updated");
+                }
+                Err(err) => {
+                    println!("Failed to edit Pulsar instance config");
                     println!("{}", err);
                     process::exit(1)
                 }

@@ -1,5 +1,4 @@
 use crate::InstanceConfig;
-use core::num;
 use std::cmp::min;
 
 pub fn generate_template(args: InstanceConfig) -> String {
