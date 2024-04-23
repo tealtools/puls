@@ -1,3 +1,29 @@
-# Pulsar Compose
+# puls
 
-See https://github.com/tealtools/puls/issues/1 for details.
+`puls` is a CLI tool that allows you to run a local Pulsar instance with different configurations.
+
+🚧 In active development 🚧
+
+Unlike [Pulsar Standalone](https://pulsar.apache.org/docs/next/getting-started-standalone/), you can set the number of clusters in the instance, as well as the number of broker and bookie replicas per cluster.
+
+This way you can test scenarios.
+
+## Quickstart
+
+```
+puls create --name helloworld --num-clusters 2 --num-bookies 2 --num-brokers 2
+puls run helloworld
+```
+
+## Requirements
+
+- Installed [Docker Compose](https://docs.docker.com/compose/)
+- Enough computing resources. For Docker Desktop, you can adjust available resources by following these [instructions](https://docs.docker.com/desktop/settings/mac/#resources).
+
+You can take the following numbers as a basis:
+- A cluster with 1 broker and 1 bookie needs 1 CPU core and 1GB RAM.
+- A cluster with 3 brokers and 3 bookies needs 1.5-2 CPU cores and 3GB RAM.
+
+For example, you'll need about 3-4CPU cores and 6GB RAM for the following Pulsar instance with two clusters: 
+
+`puls create --name two-clusters --num-clusters 2 --num-bookies 3 --num-brokers 3`
