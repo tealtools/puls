@@ -30,13 +30,18 @@ pub fn generate_template(instance_name: String, instance_config: InstanceConfig)
         .collect::<Vec<String>>()
         .join("\n\n");
 
-    let volumes_template = cluster_names
+    let bookie_volumes_template = cluster_names
         .map(|cluster_name| {
             (0..instance_config.num_bookies)
                 .map(|i| format!("████bookie-data-{cluster_name}-{i}:"))
                 .collect::<Vec<String>>()
                 .join("\n")
         })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    let zookeeper_volumes_template = (0..zookeepers_per_cluster)
+        .map(|i| format!("████zookeeper-data-{i}:"))
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -48,7 +53,8 @@ services:
 {cluster_templates}
 
 volumes:
-{volumes_template}
+{bookie_volumes_template}
+{zookeeper_volumes_template}
 
 networks:
 ████pulsar-net-{instance_name}:
@@ -84,7 +90,14 @@ pub fn generate_cluster_template(
         .join("\n");
 
     let bookies_template = (0..instance_config.num_bookies)
-        .map(|i| generate_bookie_template(instance_name.clone(), instance_config.clone(), cluster_name.clone(), i))
+        .map(|i| {
+            generate_bookie_template(
+                instance_name.clone(),
+                instance_config.clone(),
+                cluster_name.clone(),
+                i,
+            )
+        })
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -198,6 +211,7 @@ pub fn generate_zookeeper_template(
 ████zookeeper-{zookeeper_index}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
+████████hostname: zookeeper-{zookeeper_index}
 ████████restart: on-failure
 ████████command: bash -c \"bin/apply-config-from-env.py conf/zookeeper.conf && bin/apply-config-from-env.py conf/pulsar_env.sh && {append_zookeeper_servers} && {create_my_id_if_not_exists} && exec bin/pulsar zookeeper\"
 ████████environment:
@@ -207,6 +221,8 @@ pub fn generate_zookeeper_template(
 ████████████interval: 5s
 ████████████timeout: 5s
 ████████████retries: 10
+████████volumes:
+████████████- zookeeper-data-{zookeeper_index}:/pulsar/data
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}
@@ -419,6 +435,7 @@ pub fn generate_bookie_template(
 ████bookie-{cluster_name}-{bookie_index}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
+████████hostname: bookie-{cluster_name}-{bookie_index}
 ████████restart: on-failure
 ████████environment:
 ████████████- clusterName={cluster_name}

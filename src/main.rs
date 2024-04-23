@@ -73,7 +73,7 @@ pub struct StopCommandArgs {
 
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None, arg_required_else_help(true))]
-pub struct RenderCommandArgs {
+pub struct TemplateCommandArgs {
     pub instance_name: Option<String>,
 }
 
@@ -149,7 +149,7 @@ enum Commands {
 
     /// Render docker-compose.yml template for the specified Pulsar instance
     #[command()]
-    Render(RenderCommandArgs),
+    Template(TemplateCommandArgs),
 
     /// Get default Pulsar instance name
     #[command()]
@@ -333,7 +333,7 @@ fn create_cmd(args: CreateCommandArgs) -> Result<()> {
     write_instance_config(args.instance_name, args.instance_config, args.overwrite)
 }
 
-fn render_cmd(args: RenderCommandArgs) -> Result<()> {
+fn template_cmd(args: TemplateCommandArgs) -> Result<()> {
     let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
     let instance_config = read_instance_config(instance_name.clone())?;
     let template = generate_template(instance_name, instance_config);
@@ -613,7 +613,7 @@ fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
-        Some(Commands::Render(args)) => render_cmd(args),
+        Some(Commands::Template(args)) => template_cmd(args),
         Some(Commands::Create(args)) => {
             let event_name = if args.overwrite { "updated" } else { "created" };
 
