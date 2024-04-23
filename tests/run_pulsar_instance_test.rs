@@ -2,12 +2,12 @@ mod utils;
 
 use anyhow::Result;
 use assert_cmd::cargo::CommandCargoExt;
-use pulsar_compose::instance_config::InstanceConfig;
+use puls::instance_config::InstanceConfig;
 use std::process::Command;
 use tokio::time::{sleep, Duration};
 use utils::{
     check_cluster_connection, check_cluster_exists, check_namespace_exists, check_tenant_exists,
-    kill_all_docker_containers, rand_instance_name,
+    cleanup_docker_resources, rand_instance_name,
 };
 
 async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
@@ -23,7 +23,7 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
         let num_brokers = instance_config_clone.num_brokers;
 
         println!("Creating instance: {instance_name}");
-        let exit_status = Command::cargo_bin("pulsar-compose")
+        let exit_status = Command::cargo_bin("puls")
             .unwrap()
             .arg("create")
             .arg("--name")
@@ -43,15 +43,18 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
 
         assert!(exit_status.success());
 
-        println!("Running instance: {instance_name}");
-        Command::cargo_bin("pulsar-compose")
+        println!("Starting instance: {instance_name}");
+        let exit_status = Command::cargo_bin("puls")
             .unwrap()
-            .arg("run")
+            .arg("start")
+            .arg("--debug")
             .arg(instance_name.clone())
             .spawn()
             .unwrap()
             .wait()
-            .unwrap()
+            .unwrap();
+
+        assert!(exit_status.success());
     });
 
     let is_able_to_connect_to_all_clusters = tokio::spawn(async move {
@@ -161,11 +164,17 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
 
     assert!(is_namespace_exists);
 
-    kill_all_docker_containers()
+    cleanup_docker_resources()?;
+
+    let wait_for_seconds = 10;
+    println!("Waiting for {wait_for_seconds} seconds before running test next test to fix test flakiness");
+    // tokio::time::sleep(Duration::from_secs(wait_for_seconds)).await;
+
+    Ok(())
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_run_pulsar_instance_c1_br1_bo1_zo1() {
+async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
     test_pulsar_instance(InstanceConfig {
         name: rand_instance_name(),
         pulsar_version: "3.2.2".to_string(),
@@ -179,7 +188,7 @@ async fn test_run_pulsar_instance_c1_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_run_pulsar_instance_c2_br1_bo1_zo1() {
+async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
     test_pulsar_instance(InstanceConfig {
         name: rand_instance_name(),
         pulsar_version: "3.2.2".to_string(),
@@ -193,7 +202,7 @@ async fn test_run_pulsar_instance_c2_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_run_pulsar_instance_c3_br1_bo1_zo1() {
+async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
     test_pulsar_instance(InstanceConfig {
         name: rand_instance_name(),
         pulsar_version: "3.2.2".to_string(),
@@ -207,7 +216,7 @@ async fn test_run_pulsar_instance_c3_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_run_pulsar_instance_c1_br3_bo3_zo3() {
+async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
     test_pulsar_instance(InstanceConfig {
         name: rand_instance_name(),
         pulsar_version: "3.2.2".to_string(),
@@ -221,7 +230,7 @@ async fn test_run_pulsar_instance_c1_br3_bo3_zo3() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_run_pulsar_instance_c1_br2_bo2_zo1() {
+async fn test_start_pulsar_instance_c1_br2_bo2_zo1() {
     test_pulsar_instance(InstanceConfig {
         name: rand_instance_name(),
         pulsar_version: "3.2.2".to_string(),

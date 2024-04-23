@@ -6,17 +6,23 @@ pub fn rand_instance_name() -> String {
     "pulsar-".to_string() + &Uuid::new_v4().to_string()
 }
 
-pub fn kill_all_docker_containers() -> Result<()> {
-    println!("Killing all docker containers");
+pub fn cleanup_docker_resources() -> Result<()> {
+    println!("Cleaning up docker resources created by tests");
+
+    let kill_containers = "docker ps -q | xargs docker kill";
+    let prune_containers = "docker container prune -f";
+    let prune_volumes = "docker volume prune -a -f";
+    let prune_networks = "docker network prune -f";
+    let script = format!("{kill_containers} && {prune_containers} && {prune_volumes} && {prune_networks}");
 
     Command::new("bash")
         .stderr(Stdio::piped())
         .arg("-c")
-        .arg("docker ps -q | xargs docker kill")
-        .spawn()
-        .map_err(|e| anyhow::anyhow!("Failed to kill all docker containers: {e}"))?;
+        .arg(script)
+        .spawn()?
+        .wait_with_output()?;
 
-    print!("All docker containers successfully killed");
+    println!("Docker resources created by test cleaned up successfully");
 
     Ok(())
 }

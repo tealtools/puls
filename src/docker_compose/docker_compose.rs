@@ -1,4 +1,5 @@
 use crate::InstanceConfig;
+use core::num;
 use std::cmp::min;
 
 pub fn generate_template(args: InstanceConfig) -> String {
@@ -242,27 +243,42 @@ pub fn generate_post_cluster_create_job_template(
     };
 
     let pulsar_proxy_admin_url = format!("http://pulsar-proxy-{cluster_name}:8080");
+    let pulsar_admin = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url}");
 
     let num_clusters = args.num_clusters;
-    let register_clusters_script = (0..num_clusters)
-        .map(|cluster_index| format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} clusters create --url http://pulsar-proxy-cluster-{cluster_index}:8080 --broker-url pulsar://pulsar-proxy-cluster-{cluster_index}:6650 cluster-{cluster_index}"))
+    let register_clusters = (0..num_clusters)
+        .map(|cluster_index| format!("{pulsar_admin} clusters create --url http://pulsar-proxy-cluster-{cluster_index}:8080 --broker-url pulsar://pulsar-proxy-cluster-{cluster_index}:6650 cluster-{cluster_index}"))
         .collect::<Vec<String>>()
         .join("; ");
-    let create_cluster_tenant_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} tenants create --allowed-clusters cluster-{cluster_index} cluster-{cluster_index}-local");
-    let create_cluster_namespace_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces create cluster-{cluster_index}-local/default");
+    let create_cluster_tenant = format!("{pulsar_admin} tenants create --allowed-clusters cluster-{cluster_index} cluster-{cluster_index}-local");
+    let create_cluster_namespace = format!("{pulsar_admin} namespaces create cluster-{cluster_index}-local/default");
 
     let all_cluster_names = (0..num_clusters).map(|i| format!("cluster-{}", i)).collect::<Vec<String>>().join(",");
 
-    let create_global_tenant_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} tenants create --allowed-clusters {all_cluster_names} global");
-    let create_global_namespace_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces create global/default");
-    let set_global_namespace_clusters_script = format!("bin/pulsar-admin --admin-url {pulsar_proxy_admin_url} namespaces set-clusters --clusters {all_cluster_names} global/default");
+    let create_global_tenant = format!("{pulsar_admin} tenants create --allowed-clusters {all_cluster_names} global");
+    let create_global_namespace = format!("{pulsar_admin} namespaces create global/default");
+    let set_global_namespace_clusters = format!("{pulsar_admin} namespaces set-clusters --clusters {all_cluster_names} global/default");
+
+    let create_resources_script = format!("set +e; {register_clusters}; {create_cluster_tenant}; {create_cluster_namespace}; {create_global_tenant}; {create_global_namespace}; {set_global_namespace_clusters};");
+
+    let are_clusters_registered = (0..num_clusters)
+        .map(|cluster_index| format!("{pulsar_admin} clusters get cluster-{cluster_index}"))
+        .collect::<Vec<String>>()
+        .join("; ");
+    let is_cluster_tenant_created = format!("{pulsar_admin} tenants get cluster-{cluster_index}-local");
+    let is_cluster_namespace_created = format!("{pulsar_admin} namespaces get cluster-{cluster_index}-local/default");
+    let is_global_tenant_created = format!("{pulsar_admin} tenants get global");
+    let is_global_namespace_created = format!("{pulsar_admin} namespaces get global/default");
+
+    let check_resources_script = format!("set -e; {are_clusters_registered}; {is_cluster_tenant_created}; {is_cluster_namespace_created}; {is_global_tenant_created}; {is_global_namespace_created};");
 
     format! {"
 ████# Register new cluster {cluster_name}
 ████pulsar-post-cluster-create-job-{cluster_name}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
+████████restart: on-failure
 ████████user: pulsar
-████████command: bash -c \"{register_clusters_script}; {create_cluster_tenant_script}; {create_cluster_namespace_script}; {create_global_tenant_script}; {create_global_namespace_script}; {set_global_namespace_clusters_script};\"
+████████command: bash -c \"{create_resources_script} {check_resources_script} echo success\"
 {depends_on_proxy_template}
 {depends_on_prev_cluster_template}
 ████████networks:

@@ -1,5 +1,5 @@
 {
-  description = "Tools needed for pulsar-compose development.";
+  description = "Tools needed for puls development.";
   inputs = {
     nixpkgs = {
       url = "nixpkgs/nixos-unstable";
@@ -50,7 +50,7 @@
 
           runtimeLibraryPath = lib.makeLibraryPath ([ pkgs.zlib ]);
 
-          pulsar-compose-dev = pkgs.mkShell {
+          puls-dev = pkgs.mkShell {
             shellHook = ''
               export LD_LIBRARY_PATH="${runtimeLibraryPath}"
             '';
@@ -68,8 +68,8 @@
         in
         rec {
           packages = { };
-          packages.default = pulsar-compose-dev;
-          devShells.default = pulsar-compose-dev;
+          packages.default = puls-dev;
+          devShells.default = puls-dev;
           devShell = devShells.default;
         }
       );

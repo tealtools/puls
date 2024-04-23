@@ -1,3 +1,3 @@
 # Pulsar Compose
 
-See https://github.com/tealtools/pulsar-compose/issues/1 for details.
+See https://github.com/tealtools/puls/issues/1 for details.
