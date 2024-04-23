@@ -10,7 +10,7 @@ use utils::{
     cleanup_docker_resources, rand_instance_name,
 };
 
-async fn test_pulsar_instance(
+async fn test_start_pulsar_instance(
     instance_name: String,
     instance_config: InstanceConfig,
 ) -> Result<()> {
@@ -48,7 +48,6 @@ async fn test_pulsar_instance(
         let exit_status = Command::cargo_bin("puls")
             .unwrap()
             .arg("start")
-            .arg("--debug")
             .arg(instance_name.clone())
             .spawn()
             .unwrap()
@@ -173,7 +172,7 @@ async fn test_pulsar_instance(
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
     let instance_name = rand_instance_name();
-    test_pulsar_instance(
+    test_start_pulsar_instance(
         instance_name,
         InstanceConfig {
             pulsar_version: "3.2.2".to_string(),
@@ -190,7 +189,7 @@ async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
     let instance_name = rand_instance_name();
-    test_pulsar_instance(
+    test_start_pulsar_instance(
         instance_name,
         InstanceConfig {
             pulsar_version: "3.2.2".to_string(),
@@ -207,7 +206,7 @@ async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
     let instance_name = rand_instance_name();
-    test_pulsar_instance(
+    test_start_pulsar_instance(
         instance_name,
         InstanceConfig {
             pulsar_version: "3.2.2".to_string(),
@@ -224,7 +223,7 @@ async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
     let instance_name = rand_instance_name();
-    test_pulsar_instance(
+    test_start_pulsar_instance(
         instance_name,
         InstanceConfig {
             pulsar_version: "3.2.2".to_string(),
@@ -241,7 +240,7 @@ async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c1_br2_bo2_zo1() {
     let instance_name = rand_instance_name();
-    test_pulsar_instance(
+    test_start_pulsar_instance(
         instance_name,
         InstanceConfig {
             pulsar_version: "3.2.2".to_string(),
@@ -253,4 +252,100 @@ async fn test_start_pulsar_instance_c1_br2_bo2_zo1() {
     )
     .await
     .unwrap();
+}
+
+async fn test_restart_pulsar_instance(
+    instance_name: String,
+    instance_config: InstanceConfig,
+) -> Result<()> {
+    let num_clusters = instance_config.num_clusters;
+    let num_zookeepers = instance_config.num_zookeepers;
+    let num_bookies = instance_config.num_bookies;
+    let num_brokers = instance_config.num_brokers;
+
+    println!("Creating instance: {instance_name}");
+    let exit_status = Command::cargo_bin("puls")?
+        .arg("create")
+        .arg("--num-clusters")
+        .arg(num_clusters.to_string())
+        .arg("--num-zookeepers")
+        .arg(num_zookeepers.to_string())
+        .arg("--num-bookies")
+        .arg(num_bookies.to_string())
+        .arg("--num-brokers")
+        .arg(num_brokers.to_string())
+        .arg(instance_name.clone())
+        .spawn()?
+        .wait()?;
+
+    assert!(exit_status.success());
+
+    fn start_instance(instance_name: String) -> Result<()> {
+        let exit_status = Command::cargo_bin("puls")?
+            .arg("start")
+            .arg(instance_name.clone())
+            .spawn()?
+            .wait()?;
+
+        assert!(exit_status.success());
+
+        let exit_status = Command::cargo_bin("puls")?
+            .arg("stop")
+            .arg(instance_name)
+            .spawn()?
+            .wait()?;
+
+        assert!(exit_status.success());
+
+        Ok(())
+    }
+
+    println!("Starting instance the first time: {instance_name}");
+
+    start_instance(instance_name.clone())?;
+
+    println!("Instance was successfully create and then stopped without purging it's data: {instance_name}");
+    println!("Starting the same instance the second time: {instance_name}");
+
+    start_instance(instance_name.clone())?;
+
+    println!("Instance was successfully create and then stopped without purging it's data: {instance_name}");
+    println!("Starting the same instance the third time: {instance_name}");
+
+    start_instance(instance_name.clone())?;
+    cleanup_docker_resources()?;
+
+    Ok(())
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_restart_pulsar_instance_c1_br1_bo1_zo1() {
+    let instance_name = rand_instance_name();
+    let instance_config = InstanceConfig {
+        pulsar_version: "3.2.2".to_string(),
+        num_clusters: 1,
+        num_brokers: 1,
+        num_bookies: 1,
+        num_zookeepers: 1,
+    };
+
+    test_restart_pulsar_instance(instance_name, instance_config)
+        .await
+        .unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_restart_pulsar_instance_c2_br2_bo2_zo2() {
+    let instance_name = rand_instance_name();
+    let instance_config = InstanceConfig {
+        pulsar_version: "3.2.2".to_string(),
+        num_clusters: 2,
+        num_brokers: 2,
+        num_bookies: 2,
+        num_zookeepers: 2,
+    };
+
+    test_restart_pulsar_instance(instance_name, instance_config)
+        .await
+        .unwrap();
 }

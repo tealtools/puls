@@ -67,7 +67,7 @@ pub struct StopCommandArgs {
     pub instance_name: Option<String>,
 
     /// Stop all Pulsar instances
-    #[arg(short, long, default_value_t = false)]
+    #[arg(long, default_value_t = false)]
     pub all: bool,
 }
 

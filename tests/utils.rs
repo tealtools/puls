@@ -13,6 +13,7 @@ pub fn cleanup_docker_resources() -> Result<()> {
     let prune_containers = "docker container prune -f";
     let prune_volumes = "docker volume prune -a -f";
     let prune_networks = "docker network prune -f";
+
     let script = format!("{kill_containers} && {prune_containers} && {prune_volumes} && {prune_networks}");
 
     Command::new("bash")
