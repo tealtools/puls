@@ -10,13 +10,15 @@ use utils::{
     cleanup_docker_resources, rand_instance_name,
 };
 
-async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
+async fn test_pulsar_instance(
+    instance_name: String,
+    instance_config: InstanceConfig,
+) -> Result<()> {
     let instance_config_yaml = serde_yaml::to_string(&instance_config)?;
     println!("Testing instance: {instance_config_yaml}");
 
     let instance_config_clone = instance_config.clone();
     tokio::spawn(async move {
-        let instance_name = instance_config_clone.name.clone();
         let num_clusters = instance_config_clone.num_clusters;
         let num_zookeepers = instance_config_clone.num_zookeepers;
         let num_bookies = instance_config_clone.num_bookies;
@@ -26,8 +28,6 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
         let exit_status = Command::cargo_bin("puls")
             .unwrap()
             .arg("create")
-            .arg("--name")
-            .arg(instance_name.clone())
             .arg("--num-clusters")
             .arg(num_clusters.to_string())
             .arg("--num-zookeepers")
@@ -36,6 +36,7 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
             .arg(num_bookies.to_string())
             .arg("--num-brokers")
             .arg(num_brokers.to_string())
+            .arg(instance_name.clone())
             .spawn()
             .unwrap()
             .wait()
@@ -137,11 +138,7 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
         loop {
             let futures = (0..instance_config.num_clusters)
                 .map(|i| {
-                    check_namespace_exists(
-                        i,
-                        format!("cluster-{i}-local"),
-                        "default".to_string(),
-                    )
+                    check_namespace_exists(i, format!("cluster-{i}-local"), "default".to_string())
                 })
                 .collect::<Vec<_>>();
 
@@ -175,70 +172,85 @@ async fn test_pulsar_instance(instance_config: InstanceConfig) -> Result<()> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
-    test_pulsar_instance(InstanceConfig {
-        name: rand_instance_name(),
-        pulsar_version: "3.2.2".to_string(),
-        num_clusters: 1,
-        num_brokers: 1,
-        num_bookies: 1,
-        num_zookeepers: 1,
-    })
+    let instance_name = rand_instance_name();
+    test_pulsar_instance(
+        instance_name,
+        InstanceConfig {
+            pulsar_version: "3.2.2".to_string(),
+            num_clusters: 1,
+            num_brokers: 1,
+            num_bookies: 1,
+            num_zookeepers: 1,
+        },
+    )
     .await
     .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
-    test_pulsar_instance(InstanceConfig {
-        name: rand_instance_name(),
-        pulsar_version: "3.2.2".to_string(),
-        num_clusters: 2,
-        num_brokers: 1,
-        num_bookies: 1,
-        num_zookeepers: 1,
-    })
+    let instance_name = rand_instance_name();
+    test_pulsar_instance(
+        instance_name,
+        InstanceConfig {
+            pulsar_version: "3.2.2".to_string(),
+            num_clusters: 2,
+            num_brokers: 1,
+            num_bookies: 1,
+            num_zookeepers: 1,
+        },
+    )
     .await
     .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
-    test_pulsar_instance(InstanceConfig {
-        name: rand_instance_name(),
-        pulsar_version: "3.2.2".to_string(),
-        num_clusters: 3,
-        num_brokers: 1,
-        num_bookies: 1,
-        num_zookeepers: 1,
-    })
+    let instance_name = rand_instance_name();
+    test_pulsar_instance(
+        instance_name,
+        InstanceConfig {
+            pulsar_version: "3.2.2".to_string(),
+            num_clusters: 3,
+            num_brokers: 1,
+            num_bookies: 1,
+            num_zookeepers: 1,
+        },
+    )
     .await
     .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
-    test_pulsar_instance(InstanceConfig {
-        name: rand_instance_name(),
-        pulsar_version: "3.2.2".to_string(),
-        num_clusters: 1,
-        num_brokers: 3,
-        num_bookies: 3,
-        num_zookeepers: 3,
-    })
+    let instance_name = rand_instance_name();
+    test_pulsar_instance(
+        instance_name,
+        InstanceConfig {
+            pulsar_version: "3.2.2".to_string(),
+            num_clusters: 1,
+            num_brokers: 3,
+            num_bookies: 3,
+            num_zookeepers: 3,
+        },
+    )
     .await
     .unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_start_pulsar_instance_c1_br2_bo2_zo1() {
-    test_pulsar_instance(InstanceConfig {
-        name: rand_instance_name(),
-        pulsar_version: "3.2.2".to_string(),
-        num_clusters: 1,
-        num_brokers: 2,
-        num_bookies: 2,
-        num_zookeepers: 1,
-    })
+    let instance_name = rand_instance_name();
+    test_pulsar_instance(
+        instance_name,
+        InstanceConfig {
+            pulsar_version: "3.2.2".to_string(),
+            num_clusters: 1,
+            num_brokers: 2,
+            num_bookies: 2,
+            num_zookeepers: 1,
+        },
+    )
     .await
     .unwrap();
 }

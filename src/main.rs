@@ -1,17 +1,15 @@
 mod docker_compose;
 mod instance_config;
 
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use clap::{Parser, Subcommand};
-use dirs::config_local_dir;
+use dirs::home_dir;
 use docker_compose::docker_compose::generate_template;
 use instance_config::InstanceConfig;
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::process;
 use std::process::Command;
-
-const DEFAULT_INSTANCE_NAME: &str = "default";
 
 #[derive(Parser)]
 #[command(version, about, long_about = None, arg_required_else_help(true))]
@@ -23,6 +21,8 @@ struct Cli {
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct CreateCommandArgs {
+    instance_name: String,
+
     #[clap(flatten)]
     pub instance_config: InstanceConfig,
 
@@ -33,7 +33,7 @@ pub struct CreateCommandArgs {
 #[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None)]
 pub struct EditCommandArgs {
-    pub instance_name: Option<String>
+    pub instance_name: Option<String>,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -50,6 +50,7 @@ pub struct LogsCommandArgs {
 pub struct StartCommandArgs {
     pub instance_name: Option<String>,
 
+    /// Follow container logs and not detach the process
     #[arg(long, default_value_t = false)]
     pub debug: bool,
 }
@@ -61,9 +62,13 @@ pub struct PsCommandArgs {
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None, arg_required_else_help(true))]
+#[command(version, about, long_about = None)]
 pub struct StopCommandArgs {
     pub instance_name: Option<String>,
+
+    /// Stop all Pulsar instances
+    #[arg(short, long, default_value_t = false)]
+    pub all: bool,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -94,19 +99,41 @@ pub struct DescribeCommandArgs {
     pub instance_name: Option<String>,
 }
 
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None)]
+pub struct GetDefaultInstanceCommandArgs {}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
+pub struct SetDefaultInstanceCommandArgs {
+    instance_name: String,
+}
+
 #[derive(Subcommand)]
 enum Commands {
-    /// Start Pulsar instance
-    #[command()]
-    Start(StartCommandArgs),
-
     /// Create a new Pulsar instance
     #[command()]
     Create(CreateCommandArgs),
 
+    /// Start Pulsar instance
+    #[command()]
+    Start(StartCommandArgs),
+
+    /// Stop specified Pulsar instance
+    #[command()]
+    Stop(StopCommandArgs),
+
     /// Edit existing Pulsar instance
     #[command()]
     Edit(EditCommandArgs),
+
+    /// Purge Pulsar instance data, but keep it's config
+    #[command()]
+    Purge(PurgeCommandArgs),
+
+    /// Delete specified Pulsar instance
+    #[command()]
+    Delete(DeleteCommandArgs),
 
     /// List all Pulsar instances
     #[command()]
@@ -120,25 +147,48 @@ enum Commands {
     #[command()]
     Ps(PsCommandArgs),
 
-    /// Stop specified Pulsar instance
-    #[command()]
-    Stop(StopCommandArgs),
-
-     /// Purge Pulsar instance data, but keep it's config
-    #[command()]
-    Purge(PurgeCommandArgs),
-
-    /// Delete specified Pulsar instance
-    #[command()]
-    Delete(DeleteCommandArgs),
-
     /// Render docker-compose.yml template for the specified Pulsar instance
     #[command()]
     Render(RenderCommandArgs),
+
+    /// Get default Pulsar instance name
+    #[command()]
+    GetDefaultInstance(GetDefaultInstanceCommandArgs),
+
+    /// Set default Pulsar instance name
+    #[command()]
+    SetDefaultInstance(SetDefaultInstanceCommandArgs),
+}
+
+fn get_default_instance_name_file() -> Result<PathBuf> {
+    let config_dir = get_config_dir()?;
+    Ok(config_dir.join("default_instance_name"))
+}
+
+fn get_default_instance_name() -> Result<String> {
+    let default_instance_name_file = get_default_instance_name_file()?;
+    if !default_instance_name_file.exists() {
+        println!("Default instance name isn't set. Setting it to \"default\"");
+        create_cmd(CreateCommandArgs {
+            instance_name: "default".to_string(),
+            instance_config: InstanceConfig::default(),
+            overwrite: false,
+        })?;
+        std::fs::write(default_instance_name_file.clone(), "default")?;
+    }
+
+    let default_instance_name = std::fs::read_to_string(default_instance_name_file.clone())?;
+    Ok(default_instance_name.trim().to_string())
+}
+
+fn set_default_instance_name(instance_name: String) -> Result<()> {
+    let default_instance_name_file = get_default_instance_name_file()?;
+    std::fs::write(default_instance_name_file.clone(), instance_name)?;
+    Ok(())
 }
 
 fn get_config_dir() -> Result<PathBuf> {
-    let config_dir = Path::new(&config_local_dir().unwrap()).join("puls");
+    let config_dir = Path::new(&home_dir().unwrap()).join(".config").join("puls");
     if !config_dir.exists() {
         std::fs::create_dir_all(config_dir.clone())?;
     }
@@ -215,10 +265,10 @@ fn get_instance_docker_compose_file(instance_name: String) -> Result<PathBuf> {
     Ok(instance_docker_compose_file)
 }
 
-fn write_instance_config(instance_config: InstanceConfig, is_overwrite: bool) -> Result<()> {
+fn write_instance_config(instance_name: String, instance_config: InstanceConfig, is_overwrite: bool) -> Result<()> {
     let config_yaml = serde_yaml::to_string(&instance_config)?;
 
-    let instance_name = instance_config.name.clone();
+    let instance_name = instance_name.clone();
     let instance_name_regex = Regex::new(r"^[a-zA-Z0-9_-]+$").unwrap();
     if !instance_name_regex.is_match(&instance_name) {
         let err_msg = "Invalid instance name provided. Only alphanumeric characters, dashes, and underscores are allowed.".to_string();
@@ -278,16 +328,15 @@ fn list_instance_configs(_args: LsCommandArgs) -> Result<Vec<InstanceConfig>> {
 fn create_cmd(args: CreateCommandArgs) -> Result<()> {
     println!(
         "Creating a new Pulsar instance {}",
-        args.instance_config.name
+        args.instance_name
     );
-    println!("S, overwrite {}", args.overwrite);
-    write_instance_config(args.instance_config, args.overwrite)
+    write_instance_config(args.instance_name, args.instance_config, args.overwrite)
 }
 
 fn render_cmd(args: RenderCommandArgs) -> Result<()> {
-    let instance_name = args.instance_name.unwrap_or(DEFAULT_INSTANCE_NAME.to_string());
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
     let instance_config = read_instance_config(instance_name.clone())?;
-    let template = generate_template(instance_config);
+    let template = generate_template(instance_name, instance_config);
     println!("{}", template);
     Ok(())
 }
@@ -303,25 +352,36 @@ fn ls_cmd(args: LsCommandArgs) -> Result<()> {
 }
 
 fn edit_cmd(args: EditCommandArgs) -> Result<()> {
-    let instance_name = args
-        .instance_name
-        .unwrap_or(DEFAULT_INSTANCE_NAME.to_string());
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
 
-    let instance_config_file = get_instance_config_file(instance_name.clone())?.to_string_lossy().to_string();
+    let is_exists = is_instance_exists(instance_name.clone())?;
+    if !is_exists {
+        return Err(Error::msg(format!(
+            "Instance \"{instance_name}\" does not exist"
+        )));
+    }
 
-    println!("Edit Pulsar instance {} config using default $EDITOR", instance_name);
+    let instance_config_file = get_instance_config_file(instance_name.clone())?
+        .to_string_lossy()
+        .to_string();
+
+    println!(
+        "Edit Pulsar instance {} config using default $EDITOR",
+        instance_name
+    );
     println!("Instance config file: {}", instance_config_file);
 
     let text_editor = std::env::var("EDITOR").unwrap_or("nano".to_string());
-    Command::new(text_editor).arg(instance_config_file).spawn()?.wait()?;
+    Command::new(text_editor)
+        .arg(instance_config_file)
+        .spawn()?
+        .wait()?;
 
     Ok(())
 }
 
 fn logs_cmd(args: LogsCommandArgs) -> Result<()> {
-    let instance_name = args
-        .instance_name
-        .unwrap_or(DEFAULT_INSTANCE_NAME.to_string());
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
     let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
 
     let mut cmd_args = vec![
@@ -344,28 +404,21 @@ fn ps_cmd(args: PsCommandArgs) -> Result<()> {
     fn ps_instance(instance_name: String) -> Result<()> {
         let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
 
-        println!("Listing containers and services for Pulsar instance: {}", instance_name);
-        println!("Docker Compose file: {}", docker_compose_file.display());
+        println!("Pulsar instance \"{}\"", instance_name);
 
-        let cmd_args = vec![
-            "compose",
-            "-f",
-            docker_compose_file.to_str().unwrap(),
-            "ps",
-        ];
+        let cmd_args = vec!["compose", "-f", docker_compose_file.to_str().unwrap(), "ps"];
 
         Command::new("docker").args(cmd_args).spawn()?.wait()?;
         Ok(())
     }
 
     match args.instance_name {
-        Some(name) => {
-            ps_instance(name)
-        }
+        Some(name) => ps_instance(name),
         None => {
             let instance_names = list_instance_names()?;
             for instance_name in instance_names {
                 ps_instance(instance_name).unwrap();
+                println!();
             }
             Ok(())
         }
@@ -373,42 +426,26 @@ fn ps_cmd(args: PsCommandArgs) -> Result<()> {
 }
 
 fn start_cmd(args: StartCommandArgs) -> Result<()> {
-    let instance_name = match args.instance_name {
-        Some(name) => name,
-        None => {
-            let default_instance_config = InstanceConfig {
-                ..Default::default()
-            };
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
 
-            println!(
-                "No instance name provided. Using default instance name: {}",
-                default_instance_config.name
-            );
-
-            let is_already_exists = is_instance_exists(default_instance_config.name.clone())?;
-            if !is_already_exists {
-                create_cmd(CreateCommandArgs {
-                    instance_config: default_instance_config.clone(),
-                    overwrite: false,
-                })?;
-            }
-
-            default_instance_config.name
-        }
-    };
+    let is_exists = is_instance_exists(instance_name.clone())?;
+    if !is_exists {
+        println!("Pulsar instance with such name does not exist: {instance_name}");
+        return Err(anyhow!("Run `puls create <instance_name>` first"));
+    }
 
     let instance_config = read_instance_config(instance_name.clone())?;
 
-    let docker_compose_template = generate_template(instance_config);
+    let docker_compose_template = generate_template(instance_name.clone(), instance_config);
     let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
     std::fs::write(docker_compose_file.clone(), docker_compose_template)?;
 
     let instance_config = read_instance_config(instance_name.clone())?;
-    println!("Starting Pulsar instance: {}", instance_name);
     println!(
-        "Instance configuration:\n---\n{}",
-        serde_yaml::to_string(&instance_config)?.trim()
+        "Starting Pulsar instance \"{}\" with configuration:",
+        instance_name
     );
+    println!("\n{}", serde_yaml::to_string(&instance_config)?.trim());
     println!("---");
 
     let ctrlc_instance_name = instance_name.clone();
@@ -420,6 +457,7 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
 
         let stop_cmd_result = stop_cmd(StopCommandArgs {
             instance_name: Some(ctrlc_instance_name.to_owned()),
+            all: false,
         });
 
         match stop_cmd_result {
@@ -442,8 +480,6 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
         "--remove-orphans",
     ];
 
-    println!("Is debug mode: {}", args.debug);
-
     if !args.debug {
         docker_compose_args.push("--wait");
         docker_compose_args.push("--detach");
@@ -457,10 +493,24 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
 
     let completed_at = std::time::Instant::now();
     let seconds_elapsed = completed_at.duration_since(started_at).as_secs();
-    println!("Pulsar instance started in {seconds_elapsed} seconds");
+    let event_name = if exit_status.success() {
+        "started"
+    } else {
+        "failed"
+    };
+    println!();
+    println!("Pulsar instance \"{instance_name}\" {event_name} in {seconds_elapsed} seconds");
 
     if !exit_status.success() {
-        let err_msg = format!("Failed to start Pulsar instance: {}", instance_name);
+        println!();
+        println!("- If you see that some container in the \"Error\" state, check the logs using `docker logs <container_name>`");
+        println!("- You can check all containers logs using `puls logs {instance_name}`");
+        println!("- Alternatively you can try to purge the instance data using `puls purge {instance_name}` and start it again by running `puls start {instance_name}`");
+        println!();
+        println!("If you think that something is wrong with puls, you can submit an issue here:");
+        println!("https://github.com/tealtools/puls/issues");
+        println!();
+        let err_msg = "Have a good day!".to_string();
         return Err(Error::msg(err_msg));
     }
 
@@ -468,31 +518,44 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
 }
 
 fn stop_cmd(args: StopCommandArgs) -> Result<()> {
-    let instance_name = args.instance_name.unwrap_or(DEFAULT_INSTANCE_NAME.to_string());
+    fn stop_instance(instance_name: String) -> Result<()> {
+        println!("Stopping Pulsar instance: {}", instance_name);
+        let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
 
-    println!("Stopping Pulsar instance: {}", instance_name);
-    let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
+        Command::new("docker")
+            .arg("compose")
+            .arg("-f")
+            .arg(docker_compose_file.clone())
+            .arg("rm")
+            .arg("--stop")
+            .arg("--force")
+            .spawn()?
+            .wait()?;
 
-    Command::new("docker")
-        .arg("compose")
-        .arg("-f")
-        .arg(docker_compose_file.clone())
-        .arg("rm")
-        .arg("--stop")
-        .arg("--force")
-        .spawn()?
-        .wait()?;
+        Command::new("docker")
+            .arg("compose")
+            .arg("-f")
+            .arg(docker_compose_file)
+            .arg("down")
+            .arg("--remove-orphans")
+            .arg("--timeout")
+            .arg("60")
+            .spawn()?
+            .wait()?;
 
-    Command::new("docker")
-        .arg("compose")
-        .arg("-f")
-        .arg(docker_compose_file)
-        .arg("down")
-        .arg("--remove-orphans")
-        .arg("--timeout")
-        .arg("60")
-        .spawn()?
-        .wait()?;
+        Ok(())
+    }
+
+    if args.all {
+        let instance_names = list_instance_names()?;
+        for instance_name in instance_names {
+            stop_instance(instance_name).unwrap();
+        }
+        return Ok(());
+    }
+
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
+    stop_instance(instance_name)?;
 
     Ok(())
 }
@@ -552,22 +615,14 @@ fn main() -> Result<()> {
     match args.command {
         Some(Commands::Render(args)) => render_cmd(args),
         Some(Commands::Create(args)) => {
-            let event_name = if args.overwrite {
-                "updated"
-            } else {
-                "created"
-            };
+            let event_name = if args.overwrite { "updated" } else { "created" };
 
             match create_cmd(args.clone()) {
                 Ok(_) => {
                     println!("Pulsar instance successfully {event_name}");
                 }
                 Err(err) => {
-                    let command_name = if args.overwrite {
-                        "update"
-                    } else {
-                        "create"
-                    };
+                    let command_name = if args.overwrite { "update" } else { "create" };
 
                     println!("Failed to {command_name} Pulsar instance config");
                     println!("{}", err);
@@ -607,7 +662,10 @@ fn main() -> Result<()> {
                     );
                 }
                 Err(err) => {
-                    println!("Failed to purge Pulsar instance data: {}", args.instance_name);
+                    println!(
+                        "Failed to purge Pulsar instance data: {}",
+                        args.instance_name
+                    );
                     println!("{}", err);
                     process::exit(1)
                 }
@@ -694,6 +752,15 @@ fn main() -> Result<()> {
                     process::exit(1)
                 }
             };
+            Ok(())
+        }
+        Some(Commands::GetDefaultInstance(_)) => {
+            let default_instance_name = get_default_instance_name()?;
+            println!("{}", default_instance_name);
+            Ok(())
+        }
+        Some(Commands::SetDefaultInstance(args)) => {
+            set_default_instance_name(args.instance_name)?;
             Ok(())
         }
         None => {

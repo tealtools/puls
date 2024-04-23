@@ -1,7 +1,6 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 
-const DEFAULT_INSTANCE_NAME: &str = "default";
 const DEFAULT_PULSAR_VERSION: &str = "3.2.2";
 const DEFAULT_NUM_CLUSTERS: &str = "1";
 const DEFAULT_NUM_BROKERS: &str = "1";
@@ -11,9 +10,6 @@ const DEFAULT_NUM_ZOOKEEPERS: &str = "1";
 #[derive(Parser, Clone, Debug, Serialize, Deserialize, PartialEq)]
 #[command(version, about, long_about = None)]
 pub struct InstanceConfig {
-    #[arg(long, default_value = DEFAULT_INSTANCE_NAME)]
-    pub name: String,
-
     #[arg(long, default_value = DEFAULT_PULSAR_VERSION)]
     pub pulsar_version: String,
 
@@ -33,7 +29,6 @@ pub struct InstanceConfig {
 impl Default for InstanceConfig {
     fn default() -> Self {
         InstanceConfig {
-            name: DEFAULT_INSTANCE_NAME.to_string(),
             pulsar_version: DEFAULT_PULSAR_VERSION.to_string(),
             num_clusters: DEFAULT_NUM_CLUSTERS.parse().unwrap(),
             num_brokers: DEFAULT_NUM_BROKERS.parse().unwrap(),

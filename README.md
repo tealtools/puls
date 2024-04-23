@@ -11,8 +11,7 @@ This way you can test scenarios.
 ## Quickstart
 
 ```
-puls create --name helloworld --num-clusters 2 --num-bookies 2 --num-brokers 2
-puls run helloworld
+puls start
 ```
 
 ## Requirements
@@ -26,4 +25,4 @@ You can take the following numbers as a basis:
 
 For example, you'll need about 3-4CPU cores and 6GB RAM for the following Pulsar instance with two clusters: 
 
-`puls create --name two-clusters --num-clusters 2 --num-bookies 3 --num-brokers 3`
+`puls create --num-clusters 2 --num-bookies 3 --num-brokers 3 multi-cluster`
