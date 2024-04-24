@@ -2,7 +2,6 @@ mod docker_compose;
 mod instance_config;
 
 use anyhow::{anyhow, Error, Result};
-use assert_cmd::output;
 use clap::{Parser, Subcommand};
 use dirs::home_dir;
 use docker_compose::docker_compose::{generate_instance, InstanceOutput, PrintInfo};
@@ -77,7 +76,7 @@ pub struct StopCommandArgs {
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None, arg_required_else_help(true))]
+#[command(version, about, long_about = None)]
 pub struct TemplateCommandArgs {
     pub instance_name: Option<String>,
 }
@@ -876,8 +875,6 @@ fn main() -> Result<()> {
 
                     instance_output.print_info();
 
-                    println!("Args {:?}", args);
-                    println!("Intance {:?}", instance_output);
                     if !args.no_open_browser {
                         for cluster_output in instance_output.clusters {
                             if let Some(url) = cluster_output.dekaf_host_url.clone() {
