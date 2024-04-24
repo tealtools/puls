@@ -180,6 +180,7 @@ async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
             num_brokers: 1,
             num_bookies: 1,
             num_zookeepers: 1,
+            with_dekaf: false,
         },
     )
     .await
@@ -197,6 +198,7 @@ async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
             num_brokers: 1,
             num_bookies: 1,
             num_zookeepers: 1,
+            with_dekaf: false,
         },
     )
     .await
@@ -214,6 +216,7 @@ async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
             num_brokers: 1,
             num_bookies: 1,
             num_zookeepers: 1,
+            with_dekaf: false,
         },
     )
     .await
@@ -231,6 +234,7 @@ async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
             num_brokers: 3,
             num_bookies: 3,
             num_zookeepers: 3,
+            with_dekaf: false,
         },
     )
     .await
@@ -248,6 +252,7 @@ async fn test_start_pulsar_instance_c1_br2_bo2_zo1() {
             num_brokers: 2,
             num_bookies: 2,
             num_zookeepers: 1,
+            with_dekaf: false,
         },
     )
     .await
@@ -327,6 +332,7 @@ async fn test_restart_pulsar_instance_c1_br1_bo1_zo1() {
         num_brokers: 1,
         num_bookies: 1,
         num_zookeepers: 1,
+        with_dekaf: false,
     };
 
     test_restart_pulsar_instance(instance_name, instance_config)
@@ -343,7 +349,7 @@ async fn test_restart_pulsar_instance_c2_br2_bo2_zo2() {
         num_brokers: 2,
         num_bookies: 2,
         num_zookeepers: 2,
-
+        with_dekaf: false,
     };
 
     test_restart_pulsar_instance(instance_name, instance_config)
