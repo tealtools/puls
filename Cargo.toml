@@ -3,6 +3,12 @@ name = "puls"
 version = "0.1.0"
 edition = "2021"
 
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+
 [dependencies]
 anyhow = "1.0.82"
 assert_cmd = { version = "2.0.14", features = ["color", "color-auto"] }

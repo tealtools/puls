@@ -36,8 +36,7 @@
             config.allowBroken = true;
           };
 
-          protoc-gen-grpc-web = pkgs.callPackage ./nix/protoc-gen-grpc-web.nix { };
-          protoc-gen-scala = pkgs.callPackage ./nix/protoc-gen-scala.nix { };
+          apache-pulsar = pkgs.callPackage ./nix/apache-pulsar.nix { };
 
           missingSysPkgs =
             if pkgs.stdenv.isDarwin then
@@ -52,17 +51,20 @@
 
           puls-dev = pkgs.mkShell {
             shellHook = ''
+              export JAVA_HOME=$(echo "$(which java)" | sed 's/\/bin\/java//g' )
               export LD_LIBRARY_PATH="${runtimeLibraryPath}"
             '';
 
             packages = [
               pkgs.gnumake
               pkgs.coreutils
+              pkgs.git
+
               pkgs.rustup
               pkgs.rustfmt
               pkgs.cargo-cross
 
-              pkgs.git
+              apache-pulsar
             ] ++ missingSysPkgs;
           };
         in
