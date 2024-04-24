@@ -94,6 +94,12 @@ pub struct PurgeCommandArgs {
 pub struct LsCommandArgs {}
 
 #[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None)]
+pub struct StatsCommandArgs {
+    pub instance_name: Option<String>,
+}
+
+#[derive(Parser, Clone, Debug)]
 #[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct DescribeCommandArgs {
     pub instance_name: Option<String>,
@@ -107,6 +113,31 @@ pub struct GetDefaultInstanceCommandArgs {}
 #[command(version, about, long_about = None, arg_required_else_help(true))]
 pub struct SetDefaultInstanceCommandArgs {
     instance_name: String,
+}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None)]
+pub struct GetDefaultClusterCommandArgs {}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None, arg_required_else_help(true))]
+pub struct SetDefaultClusterCommandArgs {
+    cluster_index: u32,
+}
+
+#[derive(Parser, Clone, Debug)]
+#[command(version, about, long_about = None)]
+pub struct ExecCommandArgs {
+    /// Pulsar instance name
+    #[arg(long)]
+    instance: Option<String>,
+
+    #[arg(trailing_var_arg = true, allow_hyphen_values = true, hide = true)]
+    command: Vec<String>,
+
+    /// Cluster index, e.g. 0, 1, 2
+    #[arg(long)]
+    cluster: Option<u32>,
 }
 
 #[derive(Subcommand)]
@@ -139,6 +170,10 @@ enum Commands {
     #[command()]
     Ls(LsCommandArgs),
 
+    /// Display resource usage statistics
+    #[command()]
+    Stats(StatsCommandArgs),
+
     /// Display logs for the specified Pulsar instance
     #[command()]
     Logs(LogsCommandArgs),
@@ -151,6 +186,10 @@ enum Commands {
     #[command()]
     Template(TemplateCommandArgs),
 
+    /// Exec an arbitrary command, e.g. `puls exec pulsar-admin tenants list`
+    #[command()]
+    Exec(ExecCommandArgs),
+
     /// Get default Pulsar instance name
     #[command()]
     GetDefaultInstance(GetDefaultInstanceCommandArgs),
@@ -158,11 +197,24 @@ enum Commands {
     /// Set default Pulsar instance name
     #[command()]
     SetDefaultInstance(SetDefaultInstanceCommandArgs),
+
+    /// Get default cluster index. Clusters are sequentially are enumerated starting from 0
+    #[command()]
+    GetDefaultCluster(GetDefaultClusterCommandArgs),
+
+    /// Set default default cluster index. Clusters are sequentially are enumerated starting from 0
+    #[command()]
+    SetDefaultCluster(SetDefaultClusterCommandArgs),
 }
 
 fn get_default_instance_name_file() -> Result<PathBuf> {
     let config_dir = get_config_dir()?;
     Ok(config_dir.join("default_instance_name"))
+}
+
+fn get_default_cluster_index_file() -> Result<PathBuf> {
+    let config_dir = get_config_dir()?;
+    Ok(config_dir.join("default_cluster_index"))
 }
 
 fn get_default_instance_name() -> Result<String> {
@@ -184,6 +236,64 @@ fn get_default_instance_name() -> Result<String> {
 fn set_default_instance_name(instance_name: String) -> Result<()> {
     let default_instance_name_file = get_default_instance_name_file()?;
     std::fs::write(default_instance_name_file.clone(), instance_name)?;
+    Ok(())
+}
+
+fn get_default_cluster_index() -> Result<u32> {
+    let default_cluster_index_file = get_default_cluster_index_file()?;
+    if !default_cluster_index_file.exists() {
+        println!("Default cluster index isn't set. Setting it to 0");
+        std::fs::write(default_cluster_index_file.clone(), "0")?;
+    }
+
+    let file_content = std::fs::read_to_string(default_cluster_index_file.clone())?;
+    let default_cluster_index: u32 = file_content.trim().parse()?;
+    Ok(default_cluster_index)
+}
+
+fn set_default_cluster_index(cluster_index: u32) -> Result<()> {
+    let default_cluster_index_file = get_default_cluster_index_file()?;
+    std::fs::write(
+        default_cluster_index_file.clone(),
+        cluster_index.to_string(),
+    )?;
+    Ok(())
+}
+
+fn exec_cmd(instance_name: String, cluster_index: u32, command: Vec<String>) -> Result<()> {
+    let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
+
+    // TODO - run in a separate container. Good enough for proof-of-concept.
+    // To implement it, we should determine the docker network name first.
+    let pulsar_proxy_service_name = format!("pulsar-proxy-cluster-{cluster_index}");
+
+    let command_as_str = command.join(" ");
+    let bash_args = [
+        "bash",
+        "-c",
+        format!("export PATH=$PATH:/pulsar/bin; {command_as_str}").as_str(),
+    ]
+    .iter()
+    .map(|arg| arg.to_string())
+    .collect::<Vec<String>>();
+
+    let mut docker_args: Vec<String> = [
+        "compose",
+        "-f",
+        docker_compose_file.to_str().unwrap(),
+        "exec",
+        "--user",
+        "pulsar",
+        &pulsar_proxy_service_name,
+    ]
+    .iter()
+    .map(|arg| arg.to_string())
+    .collect();
+
+    docker_args.extend(bash_args);
+
+    Command::new("docker").args(docker_args).spawn()?.wait()?;
+
     Ok(())
 }
 
@@ -265,7 +375,11 @@ fn get_instance_docker_compose_file(instance_name: String) -> Result<PathBuf> {
     Ok(instance_docker_compose_file)
 }
 
-fn write_instance_config(instance_name: String, instance_config: InstanceConfig, is_overwrite: bool) -> Result<()> {
+fn write_instance_config(
+    instance_name: String,
+    instance_config: InstanceConfig,
+    is_overwrite: bool,
+) -> Result<()> {
     let config_yaml = serde_yaml::to_string(&instance_config)?;
 
     let instance_name = instance_name.clone();
@@ -326,10 +440,7 @@ fn list_instance_configs(_args: LsCommandArgs) -> Result<Vec<InstanceConfig>> {
 }
 
 fn create_cmd(args: CreateCommandArgs) -> Result<()> {
-    println!(
-        "Creating a new Pulsar instance {}",
-        args.instance_name
-    );
+    println!("Creating a new Pulsar instance {}", args.instance_name);
     write_instance_config(args.instance_name, args.instance_config, args.overwrite)
 }
 
@@ -338,6 +449,23 @@ fn template_cmd(args: TemplateCommandArgs) -> Result<()> {
     let instance_config = read_instance_config(instance_name.clone())?;
     let template = generate_template(instance_name, instance_config);
     println!("{}", template);
+    Ok(())
+}
+
+fn stats_cmd(args: StatsCommandArgs) -> Result<()> {
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
+
+    let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
+
+    let cmd_args = vec![
+        "compose",
+        "-f",
+        docker_compose_file.to_str().unwrap(),
+        "stats",
+    ];
+
+    Command::new("docker").args(cmd_args).spawn()?.wait()?;
+
     Ok(())
 }
 
@@ -743,6 +871,17 @@ fn main() -> Result<()> {
             };
             Ok(())
         }
+        Some(Commands::Stats(args)) => {
+            match stats_cmd(args) {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("Failed show stats");
+                    println!("{}", err);
+                    process::exit(1)
+                }
+            };
+            Ok(())
+        }
         Some(Commands::Logs(args)) => {
             match logs_cmd(args) {
                 Ok(_) => {}
@@ -761,6 +900,23 @@ fn main() -> Result<()> {
         }
         Some(Commands::SetDefaultInstance(args)) => {
             set_default_instance_name(args.instance_name)?;
+            Ok(())
+        }
+        Some(Commands::GetDefaultCluster(_)) => {
+            let default_cluster_index = get_default_cluster_index()?;
+            println!("{}", default_cluster_index);
+            Ok(())
+        }
+        Some(Commands::SetDefaultCluster(args)) => {
+            set_default_cluster_index(args.cluster_index)?;
+            Ok(())
+        }
+        Some(Commands::Exec(args)) => {
+            let instance_name = args.instance.unwrap_or(get_default_instance_name()?);
+            let cluster_index = args.cluster.unwrap_or(get_default_cluster_index()?);
+
+            exec_cmd(instance_name, cluster_index, args.command)?;
+
             Ok(())
         }
         None => {
