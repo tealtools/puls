@@ -24,6 +24,10 @@ pub struct InstanceConfig {
 
     #[arg(long, default_value = DEFAULT_NUM_ZOOKEEPERS)]
     pub num_zookeepers: u32,
+
+    /// Enable Pulsar management UI for the instance
+    #[arg(long, default_value_t = false)]
+    pub with_dekaf: bool,
 }
 
 impl Default for InstanceConfig {
@@ -34,6 +38,7 @@ impl Default for InstanceConfig {
             num_brokers: DEFAULT_NUM_BROKERS.parse().unwrap(),
             num_bookies: DEFAULT_NUM_BOOKIES.parse().unwrap(),
             num_zookeepers: DEFAULT_NUM_ZOOKEEPERS.parse().unwrap(),
+            with_dekaf: true,
         }
     }
 }

@@ -2,9 +2,10 @@ mod docker_compose;
 mod instance_config;
 
 use anyhow::{anyhow, Error, Result};
+use assert_cmd::output;
 use clap::{Parser, Subcommand};
 use dirs::home_dir;
-use docker_compose::docker_compose::generate_template;
+use docker_compose::docker_compose::{generate_instance, InstanceOutput, PrintInfo};
 use instance_config::InstanceConfig;
 use regex::Regex;
 use std::path::{Path, PathBuf};
@@ -53,6 +54,10 @@ pub struct StartCommandArgs {
     /// Follow container logs and not detach the process
     #[arg(long, default_value_t = false)]
     pub debug: bool,
+
+    /// Disable opening the browser after starting the instance
+    #[arg(long, default_value_t = false)]
+    pub no_open_browser: bool,
 }
 
 #[derive(Parser, Clone, Debug)]
@@ -100,7 +105,7 @@ pub struct StatsCommandArgs {
 }
 
 #[derive(Parser, Clone, Debug)]
-#[command(version, about, long_about = None, arg_required_else_help(true))]
+#[command(version, about, long_about = None)]
 pub struct DescribeCommandArgs {
     pub instance_name: Option<String>,
 }
@@ -146,33 +151,25 @@ enum Commands {
     #[command()]
     Create(CreateCommandArgs),
 
-    /// Start Pulsar instance
+    /// Delete specified Pulsar instance
     #[command()]
-    Start(StartCommandArgs),
+    Delete(DeleteCommandArgs),
 
-    /// Stop specified Pulsar instance
+    /// Describe specified Pulsar instance
     #[command()]
-    Stop(StopCommandArgs),
+    Describe(DescribeCommandArgs),
 
     /// Edit existing Pulsar instance
     #[command()]
     Edit(EditCommandArgs),
 
-    /// Purge Pulsar instance data, but keep it's config
+    /// Exec an arbitrary command, e.g. `puls exec pulsar-admin tenants list`
     #[command()]
-    Purge(PurgeCommandArgs),
-
-    /// Delete specified Pulsar instance
-    #[command()]
-    Delete(DeleteCommandArgs),
+    Exec(ExecCommandArgs),
 
     /// List all Pulsar instances
     #[command()]
     Ls(LsCommandArgs),
-
-    /// Display resource usage statistics
-    #[command()]
-    Stats(StatsCommandArgs),
 
     /// Display logs for the specified Pulsar instance
     #[command()]
@@ -182,13 +179,25 @@ enum Commands {
     #[command()]
     Ps(PsCommandArgs),
 
+    /// Purge Pulsar instance data, but keep it's config
+    #[command()]
+    Purge(PurgeCommandArgs),
+
+    /// Start Pulsar instance
+    #[command()]
+    Start(StartCommandArgs),
+
+    /// Display resource usage statistics
+    #[command()]
+    Stats(StatsCommandArgs),
+
+    /// Stop specified Pulsar instance
+    #[command()]
+    Stop(StopCommandArgs),
+
     /// Render docker-compose.yml template for the specified Pulsar instance
     #[command()]
     Template(TemplateCommandArgs),
-
-    /// Exec an arbitrary command, e.g. `puls exec pulsar-admin tenants list`
-    #[command()]
-    Exec(ExecCommandArgs),
 
     /// Get default Pulsar instance name
     #[command()]
@@ -447,8 +456,8 @@ fn create_cmd(args: CreateCommandArgs) -> Result<()> {
 fn template_cmd(args: TemplateCommandArgs) -> Result<()> {
     let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
     let instance_config = read_instance_config(instance_name.clone())?;
-    let template = generate_template(instance_name, instance_config);
-    println!("{}", template);
+    let instance_output = generate_instance(instance_name, instance_config)?;
+    println!("{}", instance_output.docker_compose_template);
     Ok(())
 }
 
@@ -528,6 +537,16 @@ fn logs_cmd(args: LogsCommandArgs) -> Result<()> {
     Ok(())
 }
 
+fn describe_cmd(args: DescribeCommandArgs) -> Result<()> {
+    let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
+    let instance_config = read_instance_config(instance_name.clone())?;
+    let instance_output = generate_instance(instance_name.clone(), instance_config)?;
+
+    instance_output.print_info();
+
+    Ok(())
+}
+
 fn ps_cmd(args: PsCommandArgs) -> Result<()> {
     fn ps_instance(instance_name: String) -> Result<()> {
         let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
@@ -553,7 +572,7 @@ fn ps_cmd(args: PsCommandArgs) -> Result<()> {
     }
 }
 
-fn start_cmd(args: StartCommandArgs) -> Result<()> {
+fn start_cmd(args: StartCommandArgs) -> Result<InstanceOutput> {
     let instance_name = args.instance_name.unwrap_or(get_default_instance_name()?);
 
     let is_exists = is_instance_exists(instance_name.clone())?;
@@ -564,9 +583,12 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
 
     let instance_config = read_instance_config(instance_name.clone())?;
 
-    let docker_compose_template = generate_template(instance_name.clone(), instance_config);
+    let instance_output = generate_instance(instance_name.clone(), instance_config)?;
     let docker_compose_file = get_instance_docker_compose_file(instance_name.clone())?;
-    std::fs::write(docker_compose_file.clone(), docker_compose_template)?;
+    std::fs::write(
+        docker_compose_file.clone(),
+        instance_output.docker_compose_template.clone(),
+    )?;
 
     let instance_config = read_instance_config(instance_name.clone())?;
     println!(
@@ -606,6 +628,8 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
         docker_compose_file.to_str().unwrap(),
         "up",
         "--remove-orphans",
+        "--pull",
+        "always",
     ];
 
     if !args.debug {
@@ -642,7 +666,7 @@ fn start_cmd(args: StartCommandArgs) -> Result<()> {
         return Err(Error::msg(err_msg));
     }
 
-    Ok(())
+    Ok(instance_output)
 }
 
 fn stop_cmd(args: StopCommandArgs) -> Result<()> {
@@ -825,6 +849,16 @@ fn main() -> Result<()> {
             };
             Ok(())
         }
+        Some(Commands::Describe(args)) => {
+            match describe_cmd(args) {
+                Ok(_) => {}
+                Err(err) => {
+                    println!("{}", err);
+                    process::exit(1)
+                }
+            };
+            Ok(())
+        }
         Some(Commands::Ps(args)) => {
             match ps_cmd(args) {
                 Ok(_) => {}
@@ -836,15 +870,31 @@ fn main() -> Result<()> {
             Ok(())
         }
         Some(Commands::Start(args)) => {
-            match start_cmd(args) {
-                Ok(_) => {
+            match start_cmd(args.clone()) {
+                Ok(instance_output) => {
                     println!("Successfully started Pulsar instance");
+
+                    instance_output.print_info();
+
+                    println!("Args {:?}", args);
+                    println!("Intance {:?}", instance_output);
+                    if !args.no_open_browser {
+                        for cluster_output in instance_output.clusters {
+                            if let Some(url) = cluster_output.dekaf_host_url.clone() {
+                                println!("Opening Dekaf UI: {}", cluster_output.dekaf_host_url.clone().unwrap_or("".to_string()));
+                                webbrowser::open(&url).unwrap();
+                            }
+                        }
+                    }
+
+                    println!("See the `puls describe` command to display instance information again");
                 }
                 Err(err) => {
                     println!("{}", err);
                     process::exit(1)
                 }
             };
+
             Ok(())
         }
         Some(Commands::Stop(args)) => {

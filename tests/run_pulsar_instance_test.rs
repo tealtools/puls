@@ -343,6 +343,7 @@ async fn test_restart_pulsar_instance_c2_br2_bo2_zo2() {
         num_brokers: 2,
         num_bookies: 2,
         num_zookeepers: 2,
+
     };
 
     test_restart_pulsar_instance(instance_name, instance_config)

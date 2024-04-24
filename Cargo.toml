@@ -24,3 +24,4 @@ serde_yaml = "0.9.34"
 strum = { version = "0.26.2", features = ["derive"] }
 tokio = { version = "1.37.0", features = ["full", "test-util"] }
 uuid = { version = "1.8.0", features = ["v4", "fast-rng"] }
+webbrowser = "1.0.0"
