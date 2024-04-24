@@ -165,7 +165,6 @@ pub fn generate_cluster(
         instance_name.clone(),
         instance_config.clone(),
         cluster_name.clone(),
-        cluster_index,
     );
 
     let brokers_template = (0..instance_config.num_brokers)
@@ -353,7 +352,7 @@ pub fn generate_zookeeper_template(
 ████████deploy:
 ████████████resources:
 ████████████████limits:
-████████████████████cpus: '0.5'
+████████████████████cpus: '2'
 ████████████████████memory: 256M
 ████████networks:
 ████████████- pulsar-net-{instance_name}
@@ -366,7 +365,6 @@ pub fn generate_pulsar_init_job_template(
     instance_name: String,
     instance_config: InstanceConfig,
     cluster_name: String,
-    cluster_index: u32
 ) -> String {
     let pulsar_version = instance_config.pulsar_version;
     let web_service_url = "http://broker-{cluster_name}:8080";
@@ -377,13 +375,6 @@ pub fn generate_pulsar_init_job_template(
         .collect::<Vec<String>>()
         .join("\n");
 
-    let depends_on_prev_cluster_template = if cluster_index == 0 {
-        "".to_string()
-    } else {
-        let prev_cluster_name = format!("cluster-{}", cluster_index - 1);
-        format!("████████████pulsar-proxy-{prev_cluster_name}:\n████████████████condition: service_healthy")
-    };
-
     format! {"
 ████# Pulsar init job for cluster {cluster_name}
 ████pulsar-init-job-{cluster_name}:
@@ -391,15 +382,14 @@ pub fn generate_pulsar_init_job_template(
 ████████user: pulsar
 ████████command: bash -c \"bin/apply-config-from-env.py conf/pulsar_env.sh; bin/pulsar initialize-cluster-metadata --cluster {cluster_name} --metadata-store zk:zookeeper-0:2181/{cluster_name} --configuration-metadata-store zk:zookeeper-0:2181/{cluster_name} --web-service-url {web_service_url} --broker-service-url {broker_service_url}\"
 ████████environment:
-████████████- PULSAR_MEM=-Xms128m -Xmx128m -XX:MaxDirectMemorySize=128m -XX:+ExitOnOutOfMemoryError
+████████████- PULSAR_MEM=-Xms256m -Xmx256m -XX:MaxDirectMemorySize=256m -XX:+ExitOnOutOfMemoryError
 ████████depends_on:
 {depends_on_zookeeper_template}
-{depends_on_prev_cluster_template}
 ████████deploy:
 ████████████resources:
 ████████████████limits:
-████████████████████cpus: '0.5'
-████████████████████memory: 256M
+████████████████████cpus: '2'
+████████████████████memory: 512M
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}.trim().to_string()
@@ -430,7 +420,7 @@ pub fn generate_post_cluster_create_job_template(
         .join("; ");
     let create_cluster_tenant = format!("{pulsar_admin} tenants create --allowed-clusters cluster-{cluster_index} cluster-{cluster_index}-local");
     let create_cluster_namespace =
-        format!("{pulsar_admin} namespaces create cluster-{cluster_index}-local/default");
+        format!("{pulsar_admin} namespaces create --clusters cluster-{cluster_index} cluster-{cluster_index}-local/default");
 
     let all_cluster_names = (0..num_clusters)
         .map(|i| format!("cluster-{}", i))
@@ -444,7 +434,7 @@ pub fn generate_post_cluster_create_job_template(
         "{pulsar_admin} namespaces set-clusters --clusters {all_cluster_names} global/default"
     );
 
-    let create_resources_script = format!("set -e; {register_clusters}; {create_cluster_tenant}; {create_cluster_namespace}; {create_global_tenant}; {create_global_namespace}; {set_global_namespace_clusters};");
+    let create_resources_script = format!("{register_clusters}; {create_cluster_tenant}; {create_cluster_namespace}; {create_global_tenant}; {create_global_namespace}; {set_global_namespace_clusters};");
 
     format! {"
 ████# Register new cluster {cluster_name}
@@ -454,14 +444,14 @@ pub fn generate_post_cluster_create_job_template(
 ████████user: pulsar
 ████████command: bash -c \"{create_resources_script} echo success\"
 ████████environment:
-████████████- PULSAR_MEM=-Xms128m -Xmx128m -XX:MaxDirectMemorySize=128m -XX:+ExitOnOutOfMemoryError
+████████████- PULSAR_MEM=-Xms256m -Xmx256m -XX:MaxDirectMemorySize=256m -XX:+ExitOnOutOfMemoryError
 {depends_on_proxy_template}
 {depends_on_prev_cluster_template}
 ████████deploy:
 ████████████resources:
 ████████████████limits:
-████████████████████cpus: '0.5'
-████████████████████memory: 256M
+████████████████████cpus: '2'
+████████████████████memory: 512M
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}
@@ -552,7 +542,8 @@ pub fn generate_broker_template(
 ████████████- managedLedgerDefaultEnsembleSize={managed_ledger_default_ensemble_size}
 ████████████- managedLedgerDefaultWriteQuorum={managed_ledger_default_write_quorum}
 ████████████- managedLedgerDefaultAckQuorum={managed_ledger_default_ack_quorum}
-████████████- PULSAR_MEM=-Xms128m -Xmx128m -XX:MaxDirectMemorySize=128m -XX:+ExitOnOutOfMemoryError
+████████████- managedLedgerCacheEvictionFrequency=1000
+████████████- PULSAR_MEM=-Xms256m -Xmx256m -XX:MaxDirectMemorySize=256m -XX:+ExitOnOutOfMemoryError
 ████████command: bash -c \"bin/apply-config-from-env.py conf/broker.conf && exec bin/pulsar broker\"
 ████████healthcheck:
 ████████████test: [\"CMD\", \"curl\", \"--fail\", \"http://127.0.0.1:8080/admin/v2/brokers/health\"]
@@ -566,7 +557,7 @@ pub fn generate_broker_template(
 ████████████resources:
 ████████████████limits:
 ████████████████████cpus: '2'
-████████████████████memory: 256M
+████████████████████memory: 512M
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}

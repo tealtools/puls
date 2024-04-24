@@ -653,6 +653,11 @@ fn start_cmd(args: StartCommandArgs) -> Result<InstanceOutput> {
     println!("Pulsar instance \"{instance_name}\" {event_name} in {seconds_elapsed} seconds");
 
     if !exit_status.success() {
+        stop_cmd(StopCommandArgs {
+            instance_name: Some(instance_name.clone()),
+            all: false,
+        })?;
+
         println!();
         println!("- If you see that some container in the \"Error\" state, check the logs using `docker logs <container_name>`");
         println!("- You can check all containers logs using `puls logs {instance_name}`");
