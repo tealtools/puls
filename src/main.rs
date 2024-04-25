@@ -50,9 +50,13 @@ pub struct LogsCommandArgs {
 pub struct StartCommandArgs {
     pub instance_name: Option<String>,
 
-    /// Follow container logs and not detach the process
+    /// Follow container logs
     #[arg(long, default_value_t = false)]
-    pub debug: bool,
+    pub follow: bool,
+
+    /// Keep containers running even if instance start failed
+    #[arg(long, default_value_t = false)]
+    pub no_kill: bool,
 
     /// Disable opening the browser after starting the instance
     #[arg(long, default_value_t = false)]
@@ -631,8 +635,10 @@ fn start_cmd(args: StartCommandArgs) -> Result<InstanceOutput> {
         "always",
     ];
 
-    if !args.debug {
+    if !args.follow {
         docker_compose_args.push("--wait");
+        docker_compose_args.push("--wait-timeout");
+        docker_compose_args.push("600");
         docker_compose_args.push("--detach");
     }
 
@@ -653,10 +659,12 @@ fn start_cmd(args: StartCommandArgs) -> Result<InstanceOutput> {
     println!("Pulsar instance \"{instance_name}\" {event_name} in {seconds_elapsed} seconds");
 
     if !exit_status.success() {
-        stop_cmd(StopCommandArgs {
-            instance_name: Some(instance_name.clone()),
-            all: false,
-        })?;
+        if !args.no_kill {
+            stop_cmd(StopCommandArgs {
+                instance_name: Some(instance_name.clone()),
+                all: false,
+            })?;
+        }
 
         println!();
         println!("- If you see that some container in the \"Error\" state, check the logs using `docker logs <container_name>`");
@@ -883,13 +891,21 @@ fn main() -> Result<()> {
                     if !args.no_open_browser {
                         for cluster_output in instance_output.clusters {
                             if let Some(url) = cluster_output.dekaf_host_url.clone() {
-                                println!("Opening Dekaf UI: {}", cluster_output.dekaf_host_url.clone().unwrap_or("".to_string()));
+                                println!(
+                                    "Opening Dekaf UI: {}",
+                                    cluster_output
+                                        .dekaf_host_url
+                                        .clone()
+                                        .unwrap_or("".to_string())
+                                );
                                 webbrowser::open(&url).unwrap();
                             }
                         }
                     }
 
-                    println!("See the `puls describe` command to display instance information again");
+                    println!(
+                        "See the `puls describe` command to display instance information again"
+                    );
                 }
                 Err(err) => {
                     println!("{}", err);
