@@ -58,6 +58,10 @@ pub struct StartCommandArgs {
     #[arg(long, default_value_t = false)]
     pub no_kill: bool,
 
+    /// Pull images before starting the instance
+    #[arg(long, default_value_t = false)]
+    pub pull: bool,
+
     /// Disable opening the browser after starting the instance
     #[arg(long, default_value_t = false)]
     pub no_open_browser: bool,
@@ -631,9 +635,12 @@ fn start_cmd(args: StartCommandArgs) -> Result<InstanceOutput> {
         docker_compose_file.to_str().unwrap(),
         "up",
         "--remove-orphans",
-        "--pull",
-        "always",
     ];
+
+    if args.pull {
+        docker_compose_args.push("--pull");
+        docker_compose_args.push("always");
+    }
 
     if !args.follow {
         docker_compose_args.push("--wait");
