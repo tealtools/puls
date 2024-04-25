@@ -170,7 +170,7 @@ async fn test_start_pulsar_instance(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
+async fn test_start_pulsar_instance_c1_br1_bk1_zk1() {
     let instance_name = rand_instance_name();
     test_start_pulsar_instance(
         instance_name,
@@ -188,7 +188,7 @@ async fn test_start_pulsar_instance_c1_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
+async fn test_start_pulsar_instance_c2_br1_bk1_zk1() {
     let instance_name = rand_instance_name();
     test_start_pulsar_instance(
         instance_name,
@@ -206,7 +206,7 @@ async fn test_start_pulsar_instance_c2_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
+async fn test_start_pulsar_instance_c3_br1_bk1_zk1() {
     let instance_name = rand_instance_name();
     test_start_pulsar_instance(
         instance_name,
@@ -224,7 +224,7 @@ async fn test_start_pulsar_instance_c3_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
+async fn test_start_pulsar_instance_c1_br3_bk3_zk3() {
     let instance_name = rand_instance_name();
     test_start_pulsar_instance(
         instance_name,
@@ -242,7 +242,7 @@ async fn test_start_pulsar_instance_c1_br3_bo3_zo3() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_start_pulsar_instance_c1_br2_bo2_zo1() {
+async fn test_start_pulsar_instance_c1_br2_bk2_zk1() {
     let instance_name = rand_instance_name();
     test_start_pulsar_instance(
         instance_name,
@@ -324,7 +324,7 @@ async fn test_restart_pulsar_instance(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_restart_pulsar_instance_c1_br1_bo1_zo1() {
+async fn test_restart_pulsar_instance_c1_br1_bk1_zk1() {
     let instance_name = rand_instance_name();
     let instance_config = InstanceConfig {
         pulsar_version: "3.2.2".to_string(),
@@ -341,14 +341,14 @@ async fn test_restart_pulsar_instance_c1_br1_bo1_zo1() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_restart_pulsar_instance_c2_br2_bo2_zo2() {
+async fn test_restart_pulsar_instance_c2_br2_bk2_zk3() {
     let instance_name = rand_instance_name();
     let instance_config = InstanceConfig {
         pulsar_version: "3.2.2".to_string(),
         num_clusters: 2,
         num_brokers: 2,
         num_bookies: 2,
-        num_zookeepers: 2,
+        num_zookeepers: 3,
         with_dekaf: false,
     };
 

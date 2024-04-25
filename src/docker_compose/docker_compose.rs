@@ -113,7 +113,7 @@ pub fn generate_instance(
         .collect::<Vec<String>>()
         .join("\n\n");
 
-    let bookie_volumes_template = cluster_names
+    let bookie_volumes_template = cluster_names.clone()
         .map(|cluster_name| {
             (0..instance_config.num_bookies)
                 .map(|i| format!("████bookie-data-{cluster_name}-{i}:"))
@@ -125,6 +125,20 @@ pub fn generate_instance(
 
     let zookeeper_volumes_template = (0..zookeepers_per_cluster)
         .map(|i| format!("████zookeeper-data-{i}:"))
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    let pulsar_init_job_volumes_template = cluster_names.clone()
+        .map(|cluster_name| {
+            format!("████pulsar-init-job-{cluster_name}:")
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    let pulsar_post_cluster_create_job_volumes_template = cluster_names
+        .map(|cluster_name| {
+            format!("████pulsar-post-cluster-create-job-{cluster_name}:")
+        })
         .collect::<Vec<String>>()
         .join("\n");
 
@@ -147,6 +161,8 @@ services:
 {clusters_template}
 
 volumes:
+{pulsar_init_job_volumes_template}
+{pulsar_post_cluster_create_job_volumes_template}
 {bookie_volumes_template}
 {zookeeper_volumes_template}
 
@@ -397,12 +413,15 @@ pub fn generate_pulsar_init_job_template(
             .join(";")
     ) + &format!("/bookkeeper-{cluster_name}");
 
+    let mark_job_as_completed_script = "mkdir /pulsar/data/init-job && touch /pulsar/data/init-job/success;".to_string();
+    let exit_if_job_already_completed_script = "test -f /pulsar/data/init-job/success && exit 0;".to_string();
+
     format! {"
 ████# Pulsar init job for cluster {cluster_name}
 ████pulsar-init-job-{cluster_name}:
 ████████image: apachepulsar/pulsar:{pulsar_version}
 ████████user: pulsar
-████████command: bash -c \"bin/apply-config-from-env.py conf/pulsar_env.sh; bin/apply-config-from-env.py conf/bookkeeper.conf;  {init_pulsar_cluster_script} {init_bookkeeper_cluster_script} \"
+████████command: bash -c \"{exit_if_job_already_completed_script} bin/apply-config-from-env.py conf/pulsar_env.sh; bin/apply-config-from-env.py conf/bookkeeper.conf;  {init_pulsar_cluster_script} {init_bookkeeper_cluster_script} {mark_job_as_completed_script}\"
 ████████environment:
 ████████████- clusterName={cluster_name}
 ████████████- metadataServiceUri={metadata_service_uri}
@@ -413,6 +432,8 @@ pub fn generate_pulsar_init_job_template(
 ████████████resources:
 ████████████████limits:
 ████████████████████memory: 512M
+████████volumes:
+████████████- pulsar-init-job-{cluster_name}:/pulsar/data
 ████████networks:
 ████████████- pulsar-net-{instance_name}
 "}.trim().to_string()
