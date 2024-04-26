@@ -24,7 +24,7 @@ TODO
 ### Build from source
 
 - Clone the repository `git clone git@github.com:tealtools/puls.git && cd ./puls`
-- [Install Rust](https://www.rust-lang.org/tools/install)
+- [Install Rust](https://www.rust-lang.org/tools/install) or alternatively [install Nix](https://nixos.org/download/) and run `make dev` at the repository root to enter dev shell with all pre-installed tools.
 - Rust `cargo install --path .`
 - Check the installation `puls --version`
 
@@ -36,7 +36,7 @@ puls start
 
 ## Requirements
 
-- Installed [Docker Compose](https://docs.docker.com/compose/)
+- Installed [Docker](https://docs.docker.com/engine/install/) >= 2.24.0
 - Enough computing resources. For Docker Desktop, you can adjust available resources by following these [instructions](https://docs.docker.com/desktop/settings/mac/#resources).
 
 You can take the following numbers as a basis:
