@@ -644,8 +644,6 @@ fn start_cmd(args: StartCommandArgs) -> Result<InstanceOutput> {
 
     if !args.follow {
         docker_compose_args.push("--wait");
-        docker_compose_args.push("--wait-timeout");
-        docker_compose_args.push("600");
         docker_compose_args.push("--detach");
     }
 

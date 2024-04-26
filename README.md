@@ -8,7 +8,27 @@ Unlike [Pulsar Standalone](https://pulsar.apache.org/docs/next/getting-started-s
 
 This way you can test scenarios.
 
-## Quickstart
+## Install
+
+### MacOS using Homebrew
+
+```
+brew tap tealtools/tap
+brew install tealtools/tap/puls
+```
+
+### Linux
+
+TODO
+
+### Build from source
+
+- Clone the repository `git clone git@github.com:tealtools/puls.git && cd ./puls`
+- [Install Rust](https://www.rust-lang.org/tools/install)
+- Rust `cargo install --path .`
+- Check the installation `puls --version`
+
+## Usage
 
 ```
 puls start
