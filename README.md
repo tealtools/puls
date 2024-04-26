@@ -2,11 +2,9 @@
 
 `puls` is a CLI tool that allows you to run a local Pulsar instance with different configurations.
 
-🚧 In active development 🚧
+The motivation is to minimize the entry threshold for Pulsar novices and quickly try different Puslar features without spending much time.
 
-Unlike [Pulsar Standalone](https://pulsar.apache.org/docs/next/getting-started-standalone/), you can set the number of clusters in the instance, as well as the number of broker and bookie replicas per cluster.
-
-This way you can test scenarios.
+Pulsar [Pulsar Standalone](https://pulsar.apache.org/docs/next/getting-started-standalone/) doesn’t allow you to play with topic load balancing, geo-replication.
 
 ## Install
 
