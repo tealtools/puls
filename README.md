@@ -45,7 +45,7 @@ For example, you'll need about 3-4CPU cores and 6GB RAM for the following Pulsar
 
 ## Planned features
 
-- [Minio S3](https://github.com/minio/minio) to demonstrate the [tiered storage](https://pulsar.apache.org/docs/next/concepts-tiered-storage/)
-- Postgres to demonstrate Pulsar IO
+- [Minio S3](https://github.com/minio/minio) to demonstrate the [Pulsar tiered storage](https://pulsar.apache.org/docs/next/concepts-tiered-storage/) feature
+- Postgres to demonstrate [Pulsar IO](https://pulsar.apache.org/docs/next/io-overview/)
 - [Dekaf UI](https://www.dekaf.io/) as Pulsar management UI
 - Monitoring stack - Prometheus, Grafana
