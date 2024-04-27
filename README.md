@@ -4,8 +4,6 @@
 
 The motivation is to minimize the entry threshold for Pulsar novices and quickly try different Puslar features without spending much time.
 
-Pulsar [Pulsar Standalone](https://pulsar.apache.org/docs/next/getting-started-standalone/) doesn’t allow you to play with topic load balancing, geo-replication.
-
 ## Install
 
 ### MacOS using Homebrew
@@ -44,3 +42,10 @@ You can take the following numbers as a basis:
 For example, you'll need about 3-4CPU cores and 6GB RAM for the following Pulsar instance with two clusters: 
 
 `puls create --num-clusters 2 --num-bookies 3 --num-brokers 3 multi-cluster`
+
+## Planned features
+
+- [Minio S3](https://github.com/minio/minio) to demonstrate the [tiered storage](https://pulsar.apache.org/docs/next/concepts-tiered-storage/)
+- Postgres to demonstrate Pulsar IO
+- [Dekaf UI](https://www.dekaf.io/) as Pulsar management UI
+- Monitoring stack - Prometheus, Grafana
