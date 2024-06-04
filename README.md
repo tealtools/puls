@@ -4,6 +4,9 @@
 
 The motivation is to minimize the entry threshold for Pulsar novices and quickly try different Puslar features without spending much time.
 
+▶️
+[![Watch the video](https://img.youtube.com/vi/nGzr00cOJ9I/maxresdefault.jpg)](https://youtu.be/nGzr00cOJ9I?si=jpeBP3HLXRmf6BaSb)
+
 ## Install
 
 ### MacOS using Homebrew
